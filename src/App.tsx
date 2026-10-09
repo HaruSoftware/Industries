@@ -34,6 +34,8 @@ const MIN_EVENT_DELAY_MS = 60_000
 const MAX_EVENT_DELAY_MS = 120_000
 const GAME_EVENT_DURATION_MS = 15_000
 const GAME_EVENT_EFFECT_DURATIONS_MS = [30_000, 45_000, 60_000, 90_000]
+const CASH_EVENT_MIN_REWARD_CENTS = 5_000
+const BASE_EVENT_DEMAND_BONUS_PERCENT = 50
 
 type ProductionAnimation = {
   id: number
@@ -47,9 +49,23 @@ type ProductionEventReward = {
   durationMs: number
 }
 
-type GameEventReward = ProductionEventReward
+type DemandEventReward = {
+  target: 'demand'
+  operation: 'add'
+  amount: number
+  durationMs: number
+}
 
-type ActiveGameEffect = ProductionEventReward & {
+type CashEventReward = {
+  target: 'cash'
+  operation: 'add'
+  amount: number
+}
+
+type TimedGameEventReward = ProductionEventReward | DemandEventReward
+type GameEventReward = TimedGameEventReward | CashEventReward
+
+type ActiveGameEffect = TimedGameEventReward & {
   id: number
   source: string
   expiresAt: number
@@ -167,8 +183,11 @@ function parseGameSave(text: string): FactoryState {
     (effect): ActiveGameEffect => {
       if (
         !isRecord(effect) ||
-        effect.target !== 'production-rate' ||
-        (effect.operation !== 'add' && effect.operation !== 'multiply') ||
+        (effect.target !== 'production-rate' && effect.target !== 'demand') ||
+        (effect.target === 'production-rate' &&
+          effect.operation !== 'add' &&
+          effect.operation !== 'multiply') ||
+        (effect.target === 'demand' && effect.operation !== 'add') ||
         typeof effect.amount !== 'number' ||
         !Number.isFinite(effect.amount) ||
         effect.amount <= 0 ||
@@ -184,9 +203,26 @@ function parseGameSave(text: string): FactoryState {
         throw new Error('O save contém um bônus ativo inválido.')
       }
 
+      if (effect.target === 'demand') {
+        return {
+          target: 'demand',
+          operation: 'add',
+          amount: effect.amount,
+          durationMs: effect.durationMs,
+          id: effect.id,
+          source: effect.source,
+          expiresAt: effect.expiresAt,
+        }
+      }
+
+      const operation = effect.operation
+      if (operation !== 'add' && operation !== 'multiply') {
+        throw new Error('O save contém um bônus ativo inválido.')
+      }
+
       return {
         target: 'production-rate',
-        operation: effect.operation,
+        operation,
         amount: effect.amount,
         durationMs: effect.durationMs,
         id: effect.id,
@@ -257,7 +293,43 @@ function getRandomEventDelay(
   return minimum + Math.random() * (maximum - minimum)
 }
 
-function createRandomGameEvent(now: number): GameEvent {
+function getCappedMoneyAmount(value: number) {
+  return Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.round(value)))
+}
+
+function getMissionInvestmentCents(level: number, multiplier = 1) {
+  const cumulativeLevelSquares = (level * (level + 1) * (2 * level + 1)) / 6
+  return getCappedMoneyAmount(
+    FIRST_SKILL_COST_CENTS * multiplier * cumulativeLevelSquares,
+  )
+}
+
+function getWorkerInvestmentCents(workers: number) {
+  if (workers <= 0) return 0
+  const total =
+    (FIRST_WORKER_COST_CENTS *
+      (WORKER_COST_GROWTH ** workers - 1)) /
+    (WORKER_COST_GROWTH - 1)
+  return getCappedMoneyAmount(total)
+}
+
+function getFactoryNetWorthCents(factory: FactoryState) {
+  const inventoryValue = getCappedMoneyAmount(
+    factory.inventory * factory.priceCents,
+  )
+  return getCappedMoneyAmount(
+    factory.cashCents +
+      inventoryValue +
+      getWorkerInvestmentCents(factory.workers) +
+      getMissionInvestmentCents(factory.workerSkills) +
+      getMissionInvestmentCents(factory.demandSkills, 2),
+  )
+}
+
+function createRandomGameEvent(
+  now: number,
+  factory: FactoryState,
+): GameEvent {
   const organization =
     EVENT_ORGANIZATIONS[
       Math.floor(Math.random() * EVENT_ORGANIZATIONS.length)
@@ -266,31 +338,62 @@ function createRandomGameEvent(now: number): GameEvent {
     GAME_EVENT_EFFECT_DURATIONS_MS[
       Math.floor(Math.random() * GAME_EVENT_EFFECT_DURATIONS_MS.length)
     ]
-  const reward: GameEventReward =
-    Math.random() < 0.5
-      ? {
-          target: 'production-rate',
-          operation: 'add',
-          amount:
-            EVENT_PRODUCTION_REWARDS[
-              Math.floor(Math.random() * EVENT_PRODUCTION_REWARDS.length)
-            ],
-          durationMs,
-        }
-      : {
-          target: 'production-rate',
-          operation: 'multiply',
-          amount:
-            EVENT_PRODUCTION_MULTIPLIERS[
-              Math.floor(Math.random() * EVENT_PRODUCTION_MULTIPLIERS.length)
-            ],
-          durationMs,
-        }
+  const rewardType = Math.random()
+  let reward: GameEventReward
+  if (rewardType < 0.25) {
+    const netWorth = getFactoryNetWorthCents(factory)
+    const proportion = 0.005 + Math.random() * 0.015
+    reward = {
+      target: 'cash',
+      operation: 'add',
+      amount: getCappedMoneyAmount(
+        Math.max(CASH_EVENT_MIN_REWARD_CENTS, netWorth * proportion),
+      ),
+    }
+  } else if (rewardType < 0.5) {
+    const netWorth = getFactoryNetWorthCents(factory)
+    const progressionScale =
+      1 + Math.log10(1 + netWorth / FIRST_WORKER_COST_CENTS)
+    reward = {
+      target: 'demand',
+      operation: 'add',
+      amount:
+        Math.round(
+          BASE_EVENT_DEMAND_BONUS_PERCENT * progressionScale * 10,
+        ) / 10,
+      durationMs,
+    }
+  } else if (rewardType < 0.75) {
+    reward = {
+      target: 'production-rate',
+      operation: 'add',
+      amount:
+        EVENT_PRODUCTION_REWARDS[
+          Math.floor(Math.random() * EVENT_PRODUCTION_REWARDS.length)
+        ],
+      durationMs,
+    }
+  } else {
+    reward = {
+      target: 'production-rate',
+      operation: 'multiply',
+      amount:
+        EVENT_PRODUCTION_MULTIPLIERS[
+          Math.floor(Math.random() * EVENT_PRODUCTION_MULTIPLIERS.length)
+        ],
+      durationMs,
+    }
+  }
 
   return {
     id: now,
     organization,
-    message: `${organization} ficou impressionada com o ritmo da sua fábrica e quer reconhecer sua produção.`,
+    message:
+      reward.target === 'cash'
+        ? `${organization} quer investir no crescimento da sua fábrica.`
+        : reward.target === 'demand'
+          ? `${organization} vai divulgar seus produtos e ampliar sua demanda por tempo limitado.`
+          : `${organization} ficou impressionada com o ritmo da sua fábrica e quer reconhecer sua produção.`,
     reward,
     createdAt: now,
     expiresAt: now + GAME_EVENT_DURATION_MS,
@@ -298,6 +401,12 @@ function createRandomGameEvent(now: number): GameEvent {
 }
 
 function formatEventReward(reward: GameEventReward) {
+  if (reward.target === 'cash') {
+    return formatCurrency(reward.amount / 100)
+  }
+  if (reward.target === 'demand') {
+    return `+${formatPercent(reward.amount)} demanda`
+  }
   if (reward.operation === 'multiply') {
     return `×${formatNumber(reward.amount)} produção`
   }
@@ -322,10 +431,16 @@ function getProductionRate(
 ) {
   const activeEffects = effects.filter((effect) => effect.expiresAt > now)
   const additionalProduction = activeEffects
-    .filter((effect) => effect.operation === 'add')
+    .filter(
+      (effect) =>
+        effect.target === 'production-rate' && effect.operation === 'add',
+    )
     .reduce((total, effect) => total + effect.amount, 0)
   const productionMultiplier = activeEffects
-    .filter((effect) => effect.operation === 'multiply')
+    .filter(
+      (effect) =>
+        effect.target === 'production-rate' && effect.operation === 'multiply',
+    )
     .reduce((total, effect) => total * effect.amount, 1)
 
   return (
@@ -353,6 +468,14 @@ function getPriceDemandPercent(priceCents: number) {
 
 function getDemandPercent(priceCents: number, bonusDemandPercent = 0) {
   return Math.max(0, getPriceDemandPercent(priceCents) + bonusDemandPercent)
+}
+
+function getEventDemandBonusPercent(effects: ActiveGameEffect[], now: number) {
+  return effects
+    .filter(
+      (effect) => effect.target === 'demand' && effect.expiresAt > now,
+    )
+    .reduce((total, effect) => total + effect.amount, 0)
 }
 
 function getSalesPerMinute(demandPercent: number) {
@@ -455,6 +578,7 @@ function App() {
   const [productionAnimations, setProductionAnimations] = useState<
     ProductionAnimation[]
   >([])
+  const [areMissionsCollapsed, setAreMissionsCollapsed] = useState(false)
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false)
   const [saveText, setSaveText] = useState('')
   const [isSaveTextEdited, setIsSaveTextEdited] = useState(false)
@@ -468,6 +592,8 @@ function App() {
       getRandomEventDelay(FIRST_EVENT_MIN_DELAY_MS, FIRST_EVENT_MAX_DELAY_MS),
   )
   const [eventClock, setEventClock] = useState(Date.now())
+  const factoryForEvents = useRef(factory)
+  factoryForEvents.current = factory
   const nextAnimationId = useRef(0)
   const animationTimeouts = useRef(new Set<number>())
   const lastAnimatedProduction = useRef(factory.produced)
@@ -485,9 +611,13 @@ function App() {
   const nextWorkerMission = getWorkerMission(factory.workerSkills + 1)
   const nextDemandMission = getDemandMission(factory.demandSkills + 1)
   const priceDemandPercent = getPriceDemandPercent(factory.priceCents)
+  const eventDemandBonusPercent = getEventDemandBonusPercent(
+    factory.eventEffects,
+    eventClock,
+  )
   const demandPercent = getDemandPercent(
     factory.priceCents,
-    skillBonuses.demandPercent,
+    skillBonuses.demandPercent + eventDemandBonusPercent,
   )
   const salesPerMinute = getSalesPerMinute(demandPercent)
   const demandMeterPercentage =
@@ -597,7 +727,7 @@ function App() {
         setGameEvent(null)
         setNextEventAt(now + getRandomEventDelay())
       } else if (!gameEvent && now >= nextEventAt) {
-        setGameEvent(createRandomGameEvent(now))
+        setGameEvent(createRandomGameEvent(now, factoryForEvents.current))
       }
     }, 1000)
 
@@ -630,7 +760,8 @@ function App() {
         const productionProgress = productionThisSecond - producedThisSecond
         const demandPercent = getDemandPercent(
           currentFactory.priceCents,
-          bonuses.demandPercent,
+          bonuses.demandPercent +
+            getEventDemandBonusPercent(activeEffects, now),
         )
         const salesPerMinute = getSalesPerMinute(demandPercent)
         if (inventoryAfterProduction === 0 || salesPerMinute === 0) {
@@ -735,16 +866,27 @@ function App() {
     if (!gameEvent || Date.now() >= gameEvent.expiresAt) return
 
     const now = Date.now()
-    const effect: ActiveGameEffect = {
-      ...gameEvent.reward,
-      id: gameEvent.id,
-      source: gameEvent.organization,
-      expiresAt: now + gameEvent.reward.durationMs,
+    const reward = gameEvent.reward
+    if (reward.target === 'cash') {
+      setFactory((currentFactory) => ({
+        ...currentFactory,
+        cashCents: Math.min(
+          Number.MAX_SAFE_INTEGER,
+          currentFactory.cashCents + reward.amount,
+        ),
+      }))
+    } else {
+      const effect: ActiveGameEffect = {
+        ...reward,
+        id: gameEvent.id,
+        source: gameEvent.organization,
+        expiresAt: now + reward.durationMs,
+      }
+      setFactory((currentFactory) => ({
+        ...currentFactory,
+        eventEffects: [...currentFactory.eventEffects, effect],
+      }))
     }
-    setFactory((currentFactory) => ({
-      ...currentFactory,
-      eventEffects: [...currentFactory.eventEffects, effect],
-    }))
 
     setEventClock(now)
     setGameEvent(null)
@@ -1100,7 +1242,9 @@ function App() {
                 </div>
                 <span className="demand-breakdown">
                   {formatPercent(priceDemandPercent)} pelo preço +{' '}
-                  {formatPercent(skillBonuses.demandPercent)} de bônus
+                  {formatPercent(skillBonuses.demandPercent)} de habilidades
+                  {eventDemandBonusPercent > 0 &&
+                    ` + ${formatPercent(eventDemandBonusPercent)} de eventos`}
                 </span>
                 <span className="demand-sales-rate">
                   {formatRate(salesPerMinute)} porcas / min
@@ -1117,8 +1261,40 @@ function App() {
 
         </section>
 
-        <section className="mission-tracks" aria-label="Missões da linha">
-          <article className="skill-mission" aria-labelledby="worker-mission-title">
+        <section
+          className={`mission-tracks${areMissionsCollapsed ? ' is-collapsed' : ''}`}
+          aria-label="Missões da linha"
+        >
+          <header className="mission-drawer-header">
+            <div className="mission-drawer-title">
+                <p className="panel-kicker">PRÓXIMOS OBJETIVOS</p>
+                <h2>Missões</h2>
+            </div>
+            <button
+              className="mission-drawer-toggle"
+              type="button"
+              onClick={() => setAreMissionsCollapsed((collapsed) => !collapsed)}
+              aria-expanded={!areMissionsCollapsed}
+              aria-controls="mission-track-list"
+              aria-label={
+                areMissionsCollapsed
+                  ? 'Expandir missões'
+                  : 'Recolher missões'
+              }
+            >
+              {areMissionsCollapsed ? (
+                <span aria-hidden="true">‹</span>
+              ) : (
+                <span aria-hidden="true">›</span>
+              )}
+            </button>
+          </header>
+          <div className="mission-track-list" id="mission-track-list">
+          <article
+            className="skill-mission worker-mission"
+            key={`worker-${factory.workerSkills}`}
+            aria-labelledby="worker-mission-title"
+          >
             <div className="skill-mission-info">
               <p className="panel-kicker">
                 TRABALHADORES · MISSÃO {formatNumber(factory.workerSkills + 1)}
@@ -1169,7 +1345,11 @@ function App() {
             </div>
           </article>
 
-          <article className="skill-mission" aria-labelledby="demand-mission-title">
+          <article
+            className="skill-mission demand-mission"
+            key={`demand-${factory.demandSkills}`}
+            aria-labelledby="demand-mission-title"
+          >
             <div className="skill-mission-info">
               <p className="panel-kicker">
                 DEMANDA · MISSÃO {formatNumber(factory.demandSkills + 1)}
@@ -1219,6 +1399,7 @@ function App() {
                 )}
             </div>
           </article>
+          </div>
         </section>
       </section>
 
@@ -1283,14 +1464,19 @@ function App() {
               className="event-toast-card game-event"
               type="button"
               onClick={claimGameEvent}
-              aria-label={`Aceitar evento de ${gameEvent.organization}: ${formatEventReward(gameEvent.reward)} por ${gameEvent.reward.durationMs / 1000} segundos`}
+              aria-label={
+                gameEvent.reward.target === 'cash'
+                  ? `Aceitar evento de ${gameEvent.organization}: receber ${formatEventReward(gameEvent.reward)}`
+                  : `Aceitar evento de ${gameEvent.organization}: ${formatEventReward(gameEvent.reward)} por ${gameEvent.reward.durationMs / 1000} segundos`
+              }
             >
               <span className="event-toast-copy">
-                <strong>{gameEvent.organization} está impressionada</strong>
+                <strong>{gameEvent.organization} tem uma proposta especial</strong>
                 <span>{gameEvent.message}</span>
                 <small>
-                  Clique para aceitar · bônus válido por{' '}
-                  {gameEvent.reward.durationMs / 1000}s
+                  {gameEvent.reward.target === 'cash'
+                    ? 'Clique para receber o valor'
+                    : `Clique para aceitar · bônus válido por ${gameEvent.reward.durationMs / 1000}s`}
                 </small>
               </span>
               <span className="event-toast-reward">

@@ -339,7 +339,13 @@ h1 {
   border-radius: 10px;
   box-shadow: 0 4px 16px rgb(18 15 38 / 30%);
   color: #f8f7ff;
-  animation: event-border-spin 5s linear infinite;
+  animation:
+    active-effect-enter 550ms cubic-bezier(0.16, 1, 0.3, 1) both,
+    event-border-spin 5s linear infinite;
+}
+
+.active-effect-card .active-effect-icon {
+  animation: active-effect-icon-enter 650ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .active-effect-card::before,
@@ -624,6 +630,58 @@ h1 {
   }
 }
 
+@keyframes mission-drawer-enter {
+  from {
+    opacity: 0;
+    transform: translate(18px, -50%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+}
+
+@keyframes mission-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes active-effect-enter {
+  0% {
+    opacity: 0;
+    transform: translate(-18px, -8px) scale(0.94);
+  }
+  65% {
+    opacity: 1;
+    transform: translate(3px, 1px) scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0) scale(1);
+  }
+}
+
+@keyframes active-effect-icon-enter {
+  0% {
+    filter: brightness(1.8);
+    transform: scale(0.55) rotate(-35deg);
+  }
+  70% {
+    filter: brightness(1.2);
+    transform: scale(1.12) rotate(8deg);
+  }
+  100% {
+    filter: brightness(1);
+    transform: scale(1) rotate(0);
+  }
+}
+
 @keyframes event-border-spin {
   to {
     --event-angle: 360deg;
@@ -651,89 +709,307 @@ h1 {
 }
 
 .mission-tracks {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  position: fixed;
+  z-index: 12;
+  top: 50%;
+  right: max(16px, env(safe-area-inset-right));
+  width: min(390px, calc(100vw - 56px));
+  max-height: min(82vh, 720px);
+  flex-direction: column;
   gap: 12px;
-  margin-top: 12px;
+  padding: 15px;
+  border: 1px solid #d8d0c2;
+  border-right: 0;
+  border-radius: 14px 0 0 14px;
+  background: #f3f0e8;
+  box-shadow: 0 12px 38px rgb(46 48 44 / 18%);
+  color: var(--ink);
+  transform: translateY(-50%);
+  animation:
+    mission-drawer-enter 650ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition:
+    width 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-height 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    right 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    gap 350ms ease;
+}
+
+.mission-tracks::before {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: #c45c45;
+  content: '';
+  pointer-events: none;
+}
+
+.mission-tracks.is-collapsed {
+  right: 0;
+  width: 36px;
+  max-height: 54px;
+  gap: 0;
+  padding: 2px;
+  border: 1px solid #d8d0c2;
+  border-right: 0;
+  border-radius: 12px 0 0 12px;
+}
+
+.mission-drawer-header {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-left: 2px;
+  transition:
+    min-height 350ms ease,
+    padding 350ms ease;
+}
+
+.mission-drawer-title {
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    max-width 400ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 220ms ease,
+    transform 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mission-drawer-title > * {
+  white-space: nowrap;
+}
+
+.mission-drawer-header .panel-kicker {
+  margin-bottom: 2px;
+  color: var(--accent-dark);
+  font-size: 8px;
+}
+
+.mission-drawer-header h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 18px;
+  letter-spacing: -0.04em;
+}
+
+.mission-drawer-toggle {
+  display: flex;
+  min-width: 30px;
+  min-height: 30px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid #d5c9b7;
+  border-radius: 7px;
+  background: #e9e2d6;
+  color: #4a4a43;
+  cursor: pointer;
+  font: inherit;
+  font-size: 19px;
+  line-height: 1;
+  transition:
+    background 180ms ease,
+    transform 350ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mission-tracks.is-collapsed .mission-drawer-toggle {
+  min-width: 26px;
+  min-height: 30px;
+  padding: 2px;
+}
+
+.mission-drawer-toggle:hover {
+  background: #ddd2c2;
+}
+
+.mission-drawer-toggle:focus-visible {
+  outline: 3px solid rgb(196 92 69 / 35%);
+  outline-offset: 2px;
+}
+
+.mission-track-list {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(70vh, 610px);
+  padding: 3px 8px 3px 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  opacity: 1;
+  overscroll-behavior: contain;
+  scrollbar-color: #b9ae9b transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  transform: translateX(0);
+  transition:
+    max-height 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 230ms ease,
+    transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mission-track-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.mission-track-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mission-track-list::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 99px;
+  background: #b9ae9b;
+  background-clip: padding-box;
+}
+
+.mission-tracks.is-collapsed .mission-drawer-header {
+  min-height: 0;
+  justify-content: center;
+  padding: 8px 4px;
+}
+
+.mission-tracks.is-collapsed .mission-track-list {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(16px);
+}
+
+.mission-tracks.is-collapsed .mission-drawer-title {
+  display: none;
+  width: 0;
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(12px);
+  pointer-events: none;
 }
 
 .skill-mission {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 9px 12px;
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--line);
+  display: block;
+  position: relative;
+  flex: 0 0 auto;
+  padding: 15px 15px 14px 17px;
+  overflow: hidden;
+  border: 1px solid #ded8ce;
   border-radius: 10px;
-  background: #fbfaf7;
+  background: #fffefa;
+  box-shadow: 0 3px 10px rgb(46 48 44 / 7%);
+  color: var(--ink);
+  animation: mission-card-enter 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.skill-mission-info {
-  min-width: 0;
-  grid-column: 1 / -1;
+.skill-mission::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: #bd8755;
+  content: '';
+}
+
+.demand-mission::before {
+  background: #668d91;
+}
+
+.skill-mission:nth-child(2) {
+  animation-delay: 90ms;
 }
 
 .skill-mission-info .panel-kicker {
-  margin-bottom: 4px;
+  margin-bottom: 5px;
+  color: #9a6740;
+  font-size: 8px;
+}
+
+.demand-mission .skill-mission-info .panel-kicker {
+  color: #527a7e;
 }
 
 .skill-mission-info h2 {
   margin: 0;
   color: var(--ink);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
 .skill-reward {
-  display: block;
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: 10px;
+  display: inline-flex;
+  margin-top: 8px;
+  padding: 5px 8px;
+  border: 1px solid #eadcc8;
+  border-radius: 6px;
+  background: #f6efe4;
+  color: #805c38;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.demand-mission .skill-reward {
+  border-color: #d8e5e3;
+  background: #edf4f2;
+  color: #45696b;
 }
 
 .skill-progress {
-  display: flex;
+  display: grid;
   min-width: 0;
-  flex-direction: column;
-  gap: 5px;
-  grid-column: 1;
+  gap: 6px;
+  margin-top: 14px;
 }
 
 .skill-progress-track {
   height: 5px;
   overflow: hidden;
   border-radius: 99px;
-  background: #e6e3dc;
+  background: #e9e5dd;
 }
 
 .skill-progress-track span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--accent);
-  transition: width 200ms ease;
+  background: #bd8755;
+  transition: width 550ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.demand-mission .skill-progress-track span {
+  background: #668d91;
 }
 
 .skill-progress > span {
   color: var(--muted);
-  font-size: 9px;
-  white-space: nowrap;
+  font-size: 10px;
 }
 
 .skill-unlock {
-  display: grid;
-  grid-template-columns: auto auto;
+  display: flex;
   align-items: center;
-  justify-items: end;
-  gap: 4px 8px;
-  grid-column: 2;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .skill-cost {
-  color: var(--ink);
-  font-size: 11px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: #3d3a34;
+  color: #ffe38c;
+  font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -750,10 +1026,16 @@ h1 {
   font-size: 10px;
   font-weight: 650;
   white-space: nowrap;
+  transition:
+    background 180ms ease,
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms ease;
 }
 
 .skill-unlock-button:hover:not(:disabled) {
+  transform: translateY(-1px);
   background: #873d2c;
+  box-shadow: 0 4px 12px rgb(135 61 44 / 30%);
 }
 
 .skill-unlock-button:focus-visible {
@@ -767,9 +1049,10 @@ h1 {
 }
 
 .skill-status {
-  grid-column: 1 / -1;
-  color: var(--muted);
-  font-size: 9px;
+  flex: 1 0 100%;
+  color: #c6c2d1;
+  font-size: 10px;
+  text-align: right;
 }
 
 .panel {
@@ -1367,8 +1650,12 @@ h2 {
   }
 
   .mission-tracks {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
+    width: min(350px, calc(100vw - 48px));
+    max-height: min(76vh, 680px);
+  }
+
+  .mission-track-list {
+    max-height: min(66vh, 570px);
   }
 
   .line-section {
@@ -1378,14 +1665,6 @@ h2 {
     border-left: 0;
   }
 
-  .skill-mission {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 9px;
-  }
-
-  .skill-progress {
-    grid-column: 1;
-  }
 }
 
 @media (max-width: 420px) {
@@ -1472,29 +1751,13 @@ h2 {
     padding-top: 12px;
   }
 
-  .skill-mission {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 9px;
-    padding: 11px;
-  }
-
   .mission-tracks {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
+    width: min(330px, calc(100vw - 44px));
+    max-height: min(78vh, 650px);
   }
 
-  .skill-progress {
-    grid-column: 1 / -1;
-  }
-
-  .skill-unlock {
-    grid-column: 1 / -1;
-    display: flex;
-    justify-content: space-between;
-  }
-
-  .skill-status {
-    margin-left: auto;
+  .mission-track-list {
+    max-height: min(68vh, 540px);
   }
 
   .production-row {
@@ -1577,6 +1840,15 @@ h2 {
   }
 
   .active-effect-card {
+    animation: none;
+  }
+
+  .mission-tracks {
+    animation: none;
+  }
+
+  .skill-mission,
+  .active-effect-card .active-effect-icon {
     animation: none;
   }
 
