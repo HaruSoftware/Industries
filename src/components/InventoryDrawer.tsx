@@ -50,7 +50,7 @@ export function InventoryDrawer({
             aria-label={shopOpen ? 'Fechar loja de itens' : 'Abrir loja de itens'}
             title="Loja de itens"
           >
-            <Store aria-hidden="true" size={15} strokeWidth={2} />
+            <Store aria-hidden="true" size={18} strokeWidth={2} />
           </button>
           <button
             className="drawer-toggle inventory-drawer-toggle"
