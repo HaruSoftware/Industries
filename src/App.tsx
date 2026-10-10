@@ -1049,7 +1049,7 @@ function App() {
           role="tabpanel"
         >
           <div className="panel-heading">
-            <div>
+            <div className="panel-heading-line">
               <nav className="line-tabs" role="tablist" aria-label="Linhas de montagem">
                 <span className="line-tabs-label">LINHA</span>
                 <button
@@ -1076,7 +1076,7 @@ function App() {
                   02
                 </button>
               </nav>
-              <h2 id="line-title">
+              <h2 className="visually-hidden" id="line-title">
                 {activeLineTab === 'line-1' ? factory.name : 'Próxima linha'}
               </h2>
             </div>
@@ -1282,19 +1282,27 @@ function App() {
             >
               <div className="line-section-heading">
                 <h3 id="production-title">Produção</h3>
-                <span className="production-rate">
-                  {formatNumber(1 + operationsBonuses.manualProduction)}{' '}
-                  {1 + operationsBonuses.manualProduction === 1
-                    ? 'porca'
-                    : 'porcas'}{' '}
-                  por clique
-                </span>
               </div>
 
-              <div
+              <div className="production-row">
+                <div>
+                  <span className="production-count">{factory.produced}</span>
+                  <span className="production-caption">produzidas</span>
+                  <span className="production-per-second">
+                    {new Intl.NumberFormat('pt-BR', {
+                      maximumFractionDigits: 2,
+                    }).format(productionPerSecond)}{' '}
+                    porcas/s
+                  </span>
+                </div>
+              </div>
+
+              <button
                 className="assembly-floor"
-                role="img"
-                aria-label="Prensa industrial e esteira de montagem"
+                onClick={produceNut}
+                type="button"
+                aria-label={`Produzir ${formatNumber(1 + operationsBonuses.manualProduction)} ${1 + operationsBonuses.manualProduction === 1 ? 'porca' : 'porcas'}`}
+                title="Produzir porca"
               >
                 <div className="conveyor">
                   <span className="conveyor-roller" />
@@ -1332,28 +1340,7 @@ function App() {
                   )),
                 )}
                 <div className="floor-shadow" />
-              </div>
-
-              <div className="production-row">
-                <div>
-                  <span className="production-count">{factory.produced}</span>
-                  <span className="production-caption">produzidas</span>
-                  <span className="production-per-second">
-                    {new Intl.NumberFormat('pt-BR', {
-                      maximumFractionDigits: 2,
-                    }).format(productionPerSecond)}{' '}
-                    porcas/s
-                  </span>
-                </div>
-                <button
-                  className="produce-button"
-                  onClick={produceNut}
-                  type="button"
-                >
-                  <span aria-hidden="true">+</span>
-                  Produzir porca
-                </button>
-              </div>
+              </button>
 
             </section>
 
@@ -1361,17 +1348,6 @@ function App() {
               <h3 className="visually-hidden" id="market-title">
                 Venda
               </h3>
-
-              <div className="line-inventory" aria-label="Estoque desta linha">
-                <div className="line-inventory-stat">
-                  <span>Estoque</span>
-                  <strong>{factory.inventory}</strong>
-                </div>
-                <div className="line-inventory-stat">
-                  <span>Vendidas</span>
-                  <strong>{factory.sold}</strong>
-                </div>
-              </div>
 
               <div className="market-tools">
                 <div className="worker-hiring">
@@ -1436,12 +1412,34 @@ function App() {
                   </span>
                 </div>
               </div>
+
+              <div className="line-inventory" aria-label="Estoque desta linha">
+                <div className="line-inventory-stat">
+                  <span>Estoque</span>
+                  <strong>{factory.inventory}</strong>
+                </div>
+                <div className="line-inventory-stat">
+                  <span>Vendidas</span>
+                  <strong>{factory.sold}</strong>
+                </div>
+              </div>
             </section>
           </div>
 
         </section>
 
         <div className="line-side-panels">
+          <InventoryDrawer
+            line={factory}
+            demandBoostCostCents={DEMAND_BOOST_ITEM_COST_CENTS}
+            demandBoostActive={isDemandBoostActive}
+            collapsed={isInventoryCollapsed}
+            onToggleCollapsed={() =>
+              setIsInventoryCollapsed((collapsed) => !collapsed)
+            }
+            onBuyDemandBoost={buyDemandBoost}
+            onUseDemandBoost={useDemandBoost}
+          />
           <MissionDrawer
             factory={factory}
             workerMission={nextWorkerMission}
@@ -1455,17 +1453,6 @@ function App() {
               setAreMissionsCollapsed((collapsed) => !collapsed)
             }
             onUnlock={unlockSkillMission}
-          />
-          <InventoryDrawer
-            line={factory}
-            demandBoostCostCents={DEMAND_BOOST_ITEM_COST_CENTS}
-            demandBoostActive={isDemandBoostActive}
-            collapsed={isInventoryCollapsed}
-            onToggleCollapsed={() =>
-              setIsInventoryCollapsed((collapsed) => !collapsed)
-            }
-            onBuyDemandBoost={buyDemandBoost}
-            onUseDemandBoost={useDemandBoost}
           />
         </div>
       </section>

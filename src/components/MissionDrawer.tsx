@@ -117,6 +117,16 @@ export function MissionDrawer({
   onToggleCollapsed,
   onUnlock,
 }: MissionDrawerProps) {
+  const availableMissionCount = [
+    canUnlockWorkerMission,
+    canUnlockDemandMission,
+    canUnlockOperationsMission,
+  ].filter(Boolean).length
+  const missionAvailabilityLabel =
+    availableMissionCount > 0
+      ? `, ${formatNumber(availableMissionCount)} ${availableMissionCount === 1 ? 'missão liberada' : 'missões liberadas'}`
+      : ''
+
   return (
     <section
       className={`mission-tracks${collapsed ? ' is-collapsed' : ''}`}
@@ -136,11 +146,16 @@ export function MissionDrawer({
           onClick={onToggleCollapsed}
           aria-expanded={!collapsed}
           aria-controls="mission-track-list"
-          aria-label={collapsed ? 'Expandir missões' : 'Recolher missões'}
+          aria-label={`${collapsed ? 'Expandir missões' : 'Recolher missões'}${missionAvailabilityLabel}`}
         >
           <span className="drawer-toggle-icons" aria-hidden="true">
-            <ClipboardList size={16} strokeWidth={2} />
+            <ClipboardList size={21} strokeWidth={2} />
           </span>
+          {availableMissionCount > 0 && (
+            <span className="mission-unlock-count" aria-hidden="true">
+              {formatNumber(availableMissionCount)}
+            </span>
+          )}
         </button>
       </header>
       <div className="mission-track-list" id="mission-track-list">

@@ -40,29 +40,31 @@ export function InventoryDrawer({
             Inventário
           </h2>
         </div>
-        <button
-          className="inventory-shop-toggle"
-          type="button"
-          onClick={() => setShopOpen((open) => !open)}
-          aria-expanded={shopOpen}
-          aria-controls={shopId}
-          aria-label={shopOpen ? 'Fechar loja de itens' : 'Abrir loja de itens'}
-          title="Loja de itens"
-        >
-          <Store aria-hidden="true" size={15} strokeWidth={2} />
-        </button>
-        <button
-          className="drawer-toggle inventory-drawer-toggle"
-          type="button"
-          onClick={onToggleCollapsed}
-          aria-expanded={!collapsed}
-          aria-controls={inventoryId}
-          aria-label={collapsed ? 'Expandir inventário' : 'Recolher inventário'}
-        >
-          <span className="drawer-toggle-icons" aria-hidden="true">
-            <PackageOpen size={16} strokeWidth={2} />
-          </span>
-        </button>
+        <div className="inventory-drawer-actions">
+          <button
+            className="inventory-shop-toggle"
+            type="button"
+            onClick={() => setShopOpen((open) => !open)}
+            aria-expanded={shopOpen}
+            aria-controls={shopId}
+            aria-label={shopOpen ? 'Fechar loja de itens' : 'Abrir loja de itens'}
+            title="Loja de itens"
+          >
+            <Store aria-hidden="true" size={15} strokeWidth={2} />
+          </button>
+          <button
+            className="drawer-toggle inventory-drawer-toggle"
+            type="button"
+            onClick={onToggleCollapsed}
+            aria-expanded={!collapsed}
+            aria-controls={inventoryId}
+            aria-label={collapsed ? 'Expandir inventário' : 'Recolher inventário'}
+          >
+            <span className="drawer-toggle-icons" aria-hidden="true">
+              <PackageOpen size={21} strokeWidth={2} />
+            </span>
+          </button>
+        </div>
       </header>
       <div className="inventory-content" id={inventoryId}>
         <div className="inventory-grid" role="grid" aria-label="Itens no inventário">
