@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Cog } from 'lucide-react'
 import { InventoryDrawer } from './components/InventoryDrawer'
 import { MissionDrawer } from './components/MissionDrawer'
 import { SaveDialog } from './components/SaveDialog'
@@ -70,9 +71,52 @@ const BASE_EVENT_DEMAND_BONUS_PERCENT = 50
 const DEMAND_BOOST_ITEM_COST_CENTS = 5_000
 const DEMAND_BOOST_PERCENT = 100
 const DEMAND_BOOST_DURATION_MS = 60_000
-const LINE_INVESTMENT_BASE_COST_CENTS = 25_000
-const LINE_INVESTMENT_COST_GROWTH = 1.5
-const LINE_INVESTMENT_PRODUCTION_PERCENT = 10
+
+type MachineUpgrade = {
+  name: string
+  description: string
+  producedRequirement: number
+  costCents: number
+  productionBonusPercent: number
+}
+
+const MACHINE_UPGRADES: MachineUpgrade[] = [
+  {
+    name: 'Eixo de precisão',
+    description: 'Reduz a vibração e melhora a cadência da prensa.',
+    producedRequirement: 100,
+    costCents: 25_000,
+    productionBonusPercent: 10,
+  },
+  {
+    name: 'Motor reforçado',
+    description: 'Aumenta a força e a velocidade da linha automática.',
+    producedRequirement: 500,
+    costCents: 75_000,
+    productionBonusPercent: 15,
+  },
+  {
+    name: 'Prensa pneumática',
+    description: 'Acelera cada ciclo sem perder precisão.',
+    producedRequirement: 2_000,
+    costCents: 200_000,
+    productionBonusPercent: 20,
+  },
+  {
+    name: 'Lubrificação automática',
+    description: 'Reduz o atrito e mantém a máquina em ritmo constante.',
+    producedRequirement: 7_500,
+    costCents: 600_000,
+    productionBonusPercent: 25,
+  },
+  {
+    name: 'Esteira de alta velocidade',
+    description: 'Moderniza o transporte entre as etapas de montagem.',
+    producedRequirement: 25_000,
+    costCents: 2_000_000,
+    productionBonusPercent: 30,
+  },
+]
 
 type ProductionAnimation = {
   id: number
@@ -148,18 +192,19 @@ function getFactoryNetWorthCents(factory: FactoryState) {
   }, factory.cashCents)
 }
 
-function getLineInvestmentCostCents(level: number) {
-  return getCappedMoneyAmount(
-    LINE_INVESTMENT_BASE_COST_CENTS * LINE_INVESTMENT_COST_GROWTH ** level,
+function getMachineProductionBonusPercent(level: number) {
+  return MACHINE_UPGRADES.slice(0, level).reduce(
+    (total, upgrade) => total + upgrade.productionBonusPercent,
+    0,
   )
 }
 
 function getLineInvestmentValueCents(level: number) {
-  if (level <= 0) return 0
   return getCappedMoneyAmount(
-    (LINE_INVESTMENT_BASE_COST_CENTS *
-      (LINE_INVESTMENT_COST_GROWTH ** level - 1)) /
-      (LINE_INVESTMENT_COST_GROWTH - 1),
+    MACHINE_UPGRADES.slice(0, level).reduce(
+      (total, upgrade) => total + upgrade.costCents,
+      0,
+    ),
   )
 }
 
@@ -376,7 +421,7 @@ function App() {
   const productionPerSecond = getProductionRate(
     factory.workers,
     skillBonuses.productionPercent +
-      factory.investmentLevel * LINE_INVESTMENT_PRODUCTION_PERCENT,
+      getMachineProductionBonusPercent(factory.investmentLevel),
     factory.eventEffects,
     eventClock,
   )
@@ -390,9 +435,17 @@ function App() {
     factory.eventEffects,
     eventClock,
   )
-  const investmentCostCents = getLineInvestmentCostCents(
-    factory.investmentLevel,
-  )
+  const nextMachineUpgrade = MACHINE_UPGRADES[factory.investmentLevel]
+  const investmentProgressPercent = nextMachineUpgrade
+    ? Math.min(
+        100,
+        (factory.produced / nextMachineUpgrade.producedRequirement) * 100,
+      )
+    : 100
+  const canInstallMachineUpgrade =
+    nextMachineUpgrade !== undefined &&
+    factory.produced >= nextMachineUpgrade.producedRequirement &&
+    factory.cashCents >= nextMachineUpgrade.costCents
   const isDemandBoostActive = factory.eventEffects.some(
     (effect) =>
       effect.target === 'demand' &&
@@ -535,7 +588,7 @@ function App() {
             getProductionRate(
               line.workers,
               bonuses.productionPercent +
-                line.investmentLevel * LINE_INVESTMENT_PRODUCTION_PERCENT,
+                getMachineProductionBonusPercent(line.investmentLevel),
               activeEffects,
               now,
             )
@@ -775,12 +828,18 @@ function App() {
     setFactoryState((currentFactory) => {
       const line = currentFactory.lines.find(({ id }) => id === factory.id)
       if (!line) return currentFactory
-      const costCents = getLineInvestmentCostCents(line.investmentLevel)
-      if (currentFactory.cashCents < costCents) return currentFactory
+      const upgrade = MACHINE_UPGRADES[line.investmentLevel]
+      if (
+        !upgrade ||
+        line.produced < upgrade.producedRequirement ||
+        currentFactory.cashCents < upgrade.costCents
+      ) {
+        return currentFactory
+      }
 
       return {
         ...currentFactory,
-        cashCents: currentFactory.cashCents - costCents,
+        cashCents: currentFactory.cashCents - upgrade.costCents,
         lines: currentFactory.lines.map((currentLine) =>
           currentLine.id === line.id
             ? { ...currentLine, investmentLevel: currentLine.investmentLevel + 1 }
@@ -1115,6 +1174,85 @@ function App() {
                   </div>
                 </div>
                   </details>
+                  <details className="machine-investment-details">
+                    <summary
+                      className="machine-investment-trigger"
+                      aria-label={`Melhorias da máquina, nível ${formatNumber(factory.investmentLevel)}${nextMachineUpgrade ? `, próximo upgrade: ${nextMachineUpgrade.name}` : ', máquina otimizada'}`}
+                      title="Melhorar máquina"
+                    >
+                      <Cog aria-hidden="true" size={15} strokeWidth={2} />
+                      <span>N{formatNumber(factory.investmentLevel)}</span>
+                    </summary>
+                    <div className="machine-investment-popover">
+                      {nextMachineUpgrade ? (
+                        <>
+                          <p className="panel-kicker">
+                            UPGRADE {formatNumber(factory.investmentLevel + 1)} · MÁQUINA
+                          </p>
+                          <h3 className="machine-investment-title">
+                            {nextMachineUpgrade.name}
+                          </h3>
+                          <p className="machine-investment-description">
+                            {nextMachineUpgrade.description} +
+                            {formatPercent(nextMachineUpgrade.productionBonusPercent)}
+                            {' '}de produção automática.
+                          </p>
+                          <div
+                            className="machine-upgrade-progress"
+                            role="progressbar"
+                            aria-label={`Progresso para ${nextMachineUpgrade.name}`}
+                            aria-valuemin={0}
+                            aria-valuemax={nextMachineUpgrade.producedRequirement}
+                            aria-valuenow={Math.min(
+                              factory.produced,
+                              nextMachineUpgrade.producedRequirement,
+                            )}
+                          >
+                            <span
+                              style={{ width: `${investmentProgressPercent}%` }}
+                            />
+                          </div>
+                          <div className="machine-investment-meta">
+                            <span>
+                              {formatNumber(
+                                Math.min(
+                                  factory.produced,
+                                  nextMachineUpgrade.producedRequirement,
+                                ),
+                              )}{' '}
+                              / {formatNumber(nextMachineUpgrade.producedRequirement)} porcas
+                            </span>
+                            <strong>
+                              {formatCurrency(nextMachineUpgrade.costCents / 100)}
+                            </strong>
+                          </div>
+                          <button
+                            className="machine-investment-action"
+                            type="button"
+                            onClick={investInLine}
+                            disabled={!canInstallMachineUpgrade}
+                          >
+                            {factory.produced <
+                            nextMachineUpgrade.producedRequirement
+                              ? `Produza mais ${formatNumber(nextMachineUpgrade.producedRequirement - factory.produced)}`
+                              : factory.cashCents < nextMachineUpgrade.costCents
+                                ? 'Caixa insuficiente'
+                                : 'Instalar melhoria'}
+                          </button>
+                        </>
+                      ) : (
+                        <div className="machine-investment-complete">
+                          <p className="panel-kicker">LINHA OTIMIZADA</p>
+                          <h3 className="machine-investment-title">
+                            Máquina no nível máximo
+                          </h3>
+                          <p className="machine-investment-description">
+                            Todas as melhorias disponíveis foram instaladas.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </details>
                 </>
               ) : (
                 <span className="manual-tag">EM BREVE</span>
@@ -1303,34 +1441,6 @@ function App() {
 
         </section>
 
-          <section
-            className="line-management"
-            aria-label={`Investimentos de ${factory.name}`}
-          >
-            <article className="line-management-card investment-card">
-              <div className="line-management-card-heading">
-                <span className="line-management-icon investment-icon" aria-hidden="true">
-                  ⚙
-                </span>
-                <div className="line-management-copy">
-                  <strong>Investir na linha</strong>
-                  <span>+{LINE_INVESTMENT_PRODUCTION_PERCENT}% produção automática / nível</span>
-                </div>
-                <span className="line-item-count">
-                  N{formatNumber(factory.investmentLevel)}
-                </span>
-              </div>
-              <button
-                className="line-management-button investment-button"
-                type="button"
-                onClick={investInLine}
-                disabled={factory.cashCents < investmentCostCents}
-                aria-label={`Investir na linha por ${formatCurrency(investmentCostCents / 100)}`}
-              >
-                Investir · {formatCurrency(investmentCostCents / 100)}
-              </button>
-            </article>
-          </section>
         <div className="line-side-panels">
           <MissionDrawer
             factory={factory}
