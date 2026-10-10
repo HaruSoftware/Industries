@@ -939,62 +939,65 @@ function App() {
 
               <div className="market-tools">
                 <div className="worker-hiring">
-                  <button
-                    className="hire-worker-button"
-                    onClick={hireWorker}
-                    type="button"
-                    disabled={
-                      factory.cashCents <
-                      getWorkerCostCents(
-                        factory.workers,
-                        operationsBonuses.workerDiscountPercent,
-                      )
-                    }
-                    aria-label={`Contratar trabalhador por ${formatCurrency(getWorkerCostCents(factory.workers, operationsBonuses.workerDiscountPercent) / 100)}`}
-                  >
-                    <span className="worker-summary-icon" aria-hidden="true">
-                      👷
-                    </span>
-                    <span className="hire-worker-copy">
-                      <strong>Trabalhadores</strong>
-                      <small>{formatNumber(factory.workers)} contratados</small>
-                    </span>
-                    <span className="hire-worker-price">
-                      {formatCurrency(
+                  <span className="hire-worker-tooltip" title="Trabalhadores">
+                    <button
+                      className="hire-worker-button"
+                      onClick={hireWorker}
+                      type="button"
+                      disabled={
+                        factory.cashCents <
                         getWorkerCostCents(
                           factory.workers,
                           operationsBonuses.workerDiscountPercent,
-                        ) / 100,
-                      )}
-                    </span>
-                  </button>
-                  <button
-                    className="hire-worker-button marketing-agent-button"
-                    onClick={hireMarketingAgent}
-                    type="button"
-                    disabled={
-                      factory.cashCents <
-                      getMarketingAgentCostCents(factory.marketingAgents)
-                    }
-                    aria-label={`Contratar agente de marketing por ${formatCurrency(getMarketingAgentCostCents(factory.marketingAgents) / 100)}`}
+                        )
+                      }
+                      aria-label={`Contratar trabalhador por ${formatCurrency(getWorkerCostCents(factory.workers, operationsBonuses.workerDiscountPercent) / 100)}`}
+                    >
+                      <span className="worker-summary-icon" aria-hidden="true">
+                        👷
+                      </span>
+                      <span className="hire-worker-count">
+                        {formatNumber(factory.workers)}
+                      </span>
+                      <span className="hire-worker-price">
+                        {formatCurrency(
+                          getWorkerCostCents(
+                            factory.workers,
+                            operationsBonuses.workerDiscountPercent,
+                          ) / 100,
+                        )}
+                      </span>
+                    </button>
+                  </span>
+                  <span
+                    className="hire-worker-tooltip"
+                    title="Agentes de marketing"
                   >
-                    <span className="worker-summary-icon" aria-hidden="true">
-                      📣
-                    </span>
-                    <span className="hire-worker-copy">
-                      <strong>Agentes de marketing</strong>
-                      <small>
-                        {formatNumber(factory.marketingAgents)} contratados
-                      </small>
-                    </span>
-                    <span className="hire-worker-price">
-                      {formatCurrency(
-                        getMarketingAgentCostCents(
-                          factory.marketingAgents,
-                        ) / 100,
-                      )}
-                    </span>
-                  </button>
+                    <button
+                      className="hire-worker-button marketing-agent-button"
+                      onClick={hireMarketingAgent}
+                      type="button"
+                      disabled={
+                        factory.cashCents <
+                        getMarketingAgentCostCents(factory.marketingAgents)
+                      }
+                      aria-label={`Contratar agente de marketing por ${formatCurrency(getMarketingAgentCostCents(factory.marketingAgents) / 100)}`}
+                    >
+                      <span className="worker-summary-icon" aria-hidden="true">
+                        📣
+                      </span>
+                      <span className="hire-worker-count">
+                        {formatNumber(factory.marketingAgents)}
+                      </span>
+                      <span className="hire-worker-price">
+                        {formatCurrency(
+                          getMarketingAgentCostCents(
+                            factory.marketingAgents,
+                          ) / 100,
+                        )}
+                      </span>
+                    </button>
+                  </span>
                 </div>
 
                 <div className="price-setting">

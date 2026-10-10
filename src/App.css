@@ -1379,6 +1379,11 @@ h2 {
   gap: 6px;
 }
 
+.hire-worker-tooltip {
+  display: flex;
+  min-width: 0;
+}
+
 .hire-worker-button {
   display: flex;
   width: 100%;
@@ -1448,22 +1453,13 @@ h2 {
   font-size: 15px;
 }
 
-.hire-worker-copy {
-  display: flex;
+.hire-worker-count {
   min-width: 0;
   flex: 1 1 auto;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.hire-worker-copy strong {
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.hire-worker-copy small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 
 .hire-worker-price {
@@ -1686,19 +1682,112 @@ h2 {
 @media (max-width: 760px) {
   .factory-shell {
     width: min(100% - 36px, 560px);
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .factory-content {
-    padding: 28px 0 32px;
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 10px 0 12px;
+  }
+
+  .eyebrow {
+    margin-bottom: 5px;
+  }
+
+  h1 {
+    font-size: clamp(25px, 7vw, 34px);
+  }
+
+  .description {
+    display: none;
+  }
+
+  .stats {
+    margin: 9px 0 8px;
+  }
+
+  .stat-card {
+    min-height: 42px;
+    padding: 7px 11px;
+  }
+
+  .page-footer {
+    display: none;
   }
 
   .panel {
-    padding: 16px;
+    min-height: 0;
+    padding: 11px;
   }
 
   .line-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .line-section-heading {
+    min-height: 0;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .line-section-heading h3 {
+    font-size: 13px;
+  }
+
+  .production-rate {
+    display: block;
+    font-size: 8px;
+    line-height: 1.2;
+  }
+
+  .assembly-floor {
+    height: 100px;
+    margin: 8px 0 4px;
+  }
+
+  .line-section {
+    padding-top: 0;
+    padding-left: 9px;
+    border-top: 0;
+    border-left: 1px solid var(--line);
+  }
+
+  .line-inventory {
+    grid-template-columns: 1fr;
+    gap: 0;
+    padding-bottom: 5px;
+  }
+
+  .market-tools {
     grid-template-columns: minmax(0, 1fr);
-    gap: 14px;
+    gap: 6px;
+  }
+
+  .production-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 8px;
+  }
+
+  .produce-button {
+    width: 100%;
+    min-height: 36px;
+    padding: 0 8px;
+  }
+
+  .demand-breakdown {
+    font-size: 8px;
+    line-height: 1.25;
   }
 
   .mission-tracks {
@@ -1742,12 +1831,8 @@ h2 {
     font-size: 10px;
   }
 
-  h1 {
-    font-size: clamp(32px, 9vw, 44px);
-  }
-
   .stat-card {
-    min-height: 48px;
+    min-height: 40px;
     padding: 9px 11px;
   }
 
@@ -1760,7 +1845,7 @@ h2 {
   }
 
   .panel {
-    padding: 14px;
+    padding: 10px;
   }
 
   .event-toast-stack {
@@ -1812,15 +1897,6 @@ h2 {
     max-height: min(68vh, 540px);
   }
 
-  .production-row {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .produce-button {
-    width: 100%;
-  }
-
   .market-tools {
     gap: 5px;
   }
@@ -1837,8 +1913,8 @@ h2 {
     font-size: 14px;
   }
 
-  .hire-worker-copy strong {
-    font-size: 9px;
+  .hire-worker-count {
+    font-size: 10px;
   }
 
   .hire-worker-price {
