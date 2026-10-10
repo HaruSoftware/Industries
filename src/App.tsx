@@ -58,6 +58,7 @@ const FIRST_MARKETING_AGENT_COST_CENTS = 15_000
 const MARKETING_AGENT_COST_GROWTH = 1.2
 const MARKETING_AGENT_DEMAND_BONUS_PERCENT = 25
 const MAX_VISIBLE_PRODUCTION_ANIMATIONS = 8
+const MAX_VISIBLE_PRODUCTION_ANIMATION_GROUPS = 2
 const PRODUCTION_ANIMATION_DURATION_MS = 850
 const PRODUCTION_ANIMATION_STAGGER_MS = 65
 const FIRST_EVENT_MIN_DELAY_MS = 45_000
@@ -560,7 +561,7 @@ function App() {
       ),
     }
     setProductionAnimations((currentAnimations) => [
-      ...currentAnimations,
+      ...currentAnimations.slice(-(MAX_VISIBLE_PRODUCTION_ANIMATION_GROUPS - 1)),
       animation,
     ])
 
@@ -717,8 +718,6 @@ function App() {
       inventory: line.inventory + quantity,
       produced: line.produced + quantity,
     }))
-
-    addProductionAnimations(quantity)
   }
 
   function hireWorker() {
@@ -1328,12 +1327,12 @@ function App() {
 
               <div className="production-row">
                 <div>
-                  <span className="production-count">{factory.produced}</span>
+                  <span className="production-count">
+                    {formatNumber(factory.produced)}
+                  </span>
                   <span className="production-caption">produzidas</span>
                   <span className="production-per-second">
-                    {new Intl.NumberFormat('pt-BR', {
-                      maximumFractionDigits: 2,
-                    }).format(productionPerSecond)}{' '}
+                    {formatRate(productionPerSecond)}{' '}
                     porcas/s
                   </span>
                 </div>
@@ -1458,11 +1457,11 @@ function App() {
               <div className="line-inventory" aria-label="Estoque desta linha">
                 <div className="line-inventory-stat">
                   <span>Estoque</span>
-                  <strong>{factory.inventory}</strong>
+                  <strong>{formatNumber(factory.inventory)}</strong>
                 </div>
                 <div className="line-inventory-stat">
                   <span>Vendidas</span>
-                  <strong>{factory.sold}</strong>
+                  <strong>{formatNumber(factory.sold)}</strong>
                 </div>
               </div>
             </section>
