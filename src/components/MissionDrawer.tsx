@@ -1,10 +1,11 @@
-import type { FactoryState, SkillMission } from '../game/types'
+import { ClipboardList } from 'lucide-react'
+import type { ProductionLineView, SkillMission } from '../game/types'
 import { formatCurrency, formatNumber } from '../game/format'
 
 type MissionTrack = 'worker' | 'demand' | 'operations'
 
 type MissionDrawerProps = {
-  factory: FactoryState
+  factory: ProductionLineView
   workerMission: SkillMission
   demandMission: SkillMission
   operationsMission: SkillMission
@@ -124,17 +125,22 @@ export function MissionDrawer({
       <header className="mission-drawer-header">
         <div className="mission-drawer-title">
           <p className="panel-kicker">CAMPANHA INDUSTRIAL</p>
-          <h2>Contratos</h2>
+          <h2>
+            <ClipboardList aria-hidden="true" size={17} strokeWidth={2} />
+            Missões
+          </h2>
         </div>
         <button
-          className="mission-drawer-toggle"
+          className="drawer-toggle mission-drawer-toggle"
           type="button"
           onClick={onToggleCollapsed}
           aria-expanded={!collapsed}
           aria-controls="mission-track-list"
-          aria-label={collapsed ? 'Expandir contratos' : 'Recolher contratos'}
+          aria-label={collapsed ? 'Expandir missões' : 'Recolher missões'}
         >
-          <span aria-hidden="true">{collapsed ? '‹' : '›'}</span>
+          <span className="drawer-toggle-icons" aria-hidden="true">
+            <ClipboardList size={16} strokeWidth={2} />
+          </span>
         </button>
       </header>
       <div className="mission-track-list" id="mission-track-list">

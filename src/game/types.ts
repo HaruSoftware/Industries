@@ -58,10 +58,11 @@ export type SkillBonuses = {
   demandPercent: number
 }
 
-export type FactoryState = {
+export type ProductionLineState = {
+  id: string
+  name: string
   priceCents: number
   inventory: number
-  cashCents: number
   sold: number
   produced: number
   workers: number
@@ -72,15 +73,25 @@ export type FactoryState = {
   eventEffects: ActiveGameEffect[]
   productionProgress: number
   demandProgress: number
+  inventoryItems: {
+    demandBoost: number
+  }
+  investmentLevel: number
+}
+
+export type FactoryState = {
+  cashCents: number
+  lines: ProductionLineState[]
 }
 
 export const MIN_PRICE_CENTS = 1
 export const MAX_PRICE_CENTS = 10_000
 
-export const initialFactoryState: FactoryState = {
+export const initialProductionLineState: ProductionLineState = {
+  id: 'line-1',
+  name: 'Porcas',
   priceCents: 10,
   inventory: 0,
-  cashCents: 0,
   sold: 0,
   produced: 0,
   workers: 0,
@@ -91,4 +102,17 @@ export const initialFactoryState: FactoryState = {
   eventEffects: [],
   productionProgress: 0,
   demandProgress: 0,
+  inventoryItems: {
+    demandBoost: 0,
+  },
+  investmentLevel: 0,
+}
+
+export type ProductionLineView = ProductionLineState & {
+  cashCents: number
+}
+
+export const initialFactoryState: FactoryState = {
+  cashCents: 0,
+  lines: [initialProductionLineState],
 }

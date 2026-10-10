@@ -633,22 +633,11 @@ h1 {
 @keyframes mission-drawer-enter {
   from {
     opacity: 0;
-    transform: translate(18px, -50%);
+    transform: translateX(10px);
   }
   to {
     opacity: 1;
-    transform: translate(0, -50%);
-  }
-}
-
-@keyframes mission-card-enter {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateX(0);
   }
 }
 
@@ -708,32 +697,278 @@ h1 {
   margin-top: 14px;
 }
 
-.mission-tracks {
+.line-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.line-tabs-label {
+  margin-right: 2px;
+  color: var(--accent-dark);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.line-tab {
+  display: grid;
+  width: 25px;
+  height: 20px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #f4f2ed;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 8px;
+  font-weight: 700;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.line-tab:hover {
+  border-color: #c9c2b5;
+  color: var(--ink);
+}
+
+.line-tab.is-active {
+  border-color: var(--accent-dark);
+  background: var(--accent-dark);
+  color: white;
+}
+
+.line-tab:focus-visible,
+.line-management-button:focus-visible {
+  outline: 3px solid rgb(196 92 69 / 35%);
+  outline-offset: 2px;
+}
+
+.line-management {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.line-management-card {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: 1fr auto;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfaf7;
+}
+
+.line-management-card-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.line-management-icon {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  border-radius: 6px;
+  background: #f3e7d8;
+  font-size: 14px;
+}
+
+.investment-icon {
+  background: #e8ece5;
+  color: #546753;
+}
+
+.line-management-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.line-management-copy strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.line-management-copy > span {
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.25;
+}
+
+.line-item-count {
+  flex: 0 0 auto;
+  color: var(--accent-dark);
+  font-size: 9px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.line-management-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 5px;
+}
+
+.line-management-button {
+  min-width: 0;
+  min-height: 27px;
+  padding: 4px 6px;
+  border: 1px solid #a84935;
+  border-radius: 6px;
+  background: #a84935;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.line-management-secondary,
+.investment-button {
+  border-color: var(--line);
+  background: #f1efe9;
+  color: var(--ink);
+}
+
+.line-management-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.investment-button {
+  width: 100%;
+}
+
+.line-placeholder {
+  display: none;
+  min-height: 220px;
+  position: relative;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: 14px;
+  overflow: hidden;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  text-align: center;
+}
+
+.line-placeholder-index {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -62%);
+  color: rgb(196 92 69 / 7%);
+  font-size: 150px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.line-placeholder .panel-kicker,
+.line-placeholder h3,
+.line-placeholder > p:not(.panel-kicker),
+.line-placeholder-status {
+  z-index: 1;
+}
+
+.line-placeholder .panel-kicker {
+  margin-bottom: 8px;
+}
+
+.line-placeholder h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.line-placeholder > p:not(.panel-kicker) {
+  max-width: 300px;
+  margin: 8px 12px 12px;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.line-placeholder-status {
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.production-line.is-second-line .line-layout,
+.production-line.is-second-line .line-management {
+  display: none;
+}
+
+.production-line.is-second-line .line-placeholder {
+  display: flex;
+}
+
+.factory-content.is-line-two .line-side-panels,
+.factory-content.is-line-two > .line-management {
+  display: none;
+}
+
+.line-side-panels {
   display: flex;
   position: fixed;
-  z-index: 12;
-  top: 50%;
+  z-index: 20;
+  top: max(84px, env(safe-area-inset-top));
   right: max(16px, env(safe-area-inset-right));
-  width: min(390px, calc(100vw - 56px));
-  max-height: min(82vh, 720px);
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: min(390px, calc(100vw - 48px));
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.mission-tracks {
+  display: flex;
+  position: relative;
+  width: 100%;
+  max-height: min(58vh, 520px);
+  min-height: 54px;
   flex-direction: column;
   gap: 12px;
   padding: 15px;
   border: 1px solid #d8d0c2;
-  border-right: 0;
-  border-radius: 14px 0 0 14px;
+  border-radius: 12px;
   background: #f3f0e8;
   box-shadow: 0 12px 38px rgb(46 48 44 / 18%);
   color: var(--ink);
-  transform: translateY(-50%);
   animation:
-    mission-drawer-enter 650ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    mission-drawer-enter 260ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
   transition:
-    width 480ms cubic-bezier(0.22, 1, 0.36, 1),
-    max-height 480ms cubic-bezier(0.22, 1, 0.36, 1),
-    padding 480ms cubic-bezier(0.22, 1, 0.36, 1),
-    right 480ms cubic-bezier(0.22, 1, 0.36, 1),
-    gap 350ms ease;
+    width 260ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    max-height 260ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    padding 220ms ease,
+    gap 200ms ease;
+  pointer-events: auto;
 }
 
 .mission-tracks::before {
@@ -749,14 +984,54 @@ h1 {
 }
 
 .mission-tracks.is-collapsed {
-  right: 0;
-  width: 36px;
+  width: 44px;
   max-height: 54px;
   gap: 0;
   padding: 2px;
-  border: 1px solid #d8d0c2;
-  border-right: 0;
-  border-radius: 12px 0 0 12px;
+  border-radius: 10px;
+}
+
+.line-inventory-drawer {
+  display: flex;
+  position: relative;
+  width: 100%;
+  max-height: min(28vh, 240px);
+  min-height: 54px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  overflow: hidden;
+  border: 1px solid #cfd9d4;
+  border-radius: 12px;
+  background: #eef3ef;
+  box-shadow: 0 10px 30px rgb(46 48 44 / 14%);
+  color: var(--ink);
+  transition:
+    width 260ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    max-height 260ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    padding 220ms ease,
+    gap 200ms ease;
+  pointer-events: auto;
+}
+
+.line-inventory-drawer::before {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: #557563;
+  content: '';
+  pointer-events: none;
+}
+
+.line-inventory-drawer.is-collapsed {
+  width: 44px;
+  max-height: 54px;
+  gap: 0;
+  padding: 2px;
+  border-radius: 10px;
 }
 
 .mission-drawer-header {
@@ -767,8 +1042,16 @@ h1 {
   gap: 12px;
   padding-left: 2px;
   transition:
-    min-height 350ms ease,
-    padding 350ms ease;
+    min-height 200ms ease,
+    padding 200ms ease;
+}
+
+.inventory-drawer-header {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .mission-drawer-title {
@@ -778,13 +1061,24 @@ h1 {
   opacity: 1;
   transform: translateX(0);
   transition:
-    max-width 400ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 220ms ease,
-    transform 400ms cubic-bezier(0.22, 1, 0.36, 1);
+    max-width 220ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    opacity 150ms ease,
+    transform 220ms cubic-bezier(0.2, 0.75, 0.25, 1);
 }
 
 .mission-drawer-title > * {
   white-space: nowrap;
+}
+
+.inventory-drawer-title {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.inventory-drawer-title .panel-kicker {
+  margin: 0 0 2px;
+  color: #557563;
+  font-size: 8px;
 }
 
 .mission-drawer-header .panel-kicker {
@@ -794,13 +1088,30 @@ h1 {
 }
 
 .mission-drawer-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   margin: 0;
   color: var(--ink);
   font-size: 18px;
   letter-spacing: -0.04em;
 }
 
-.mission-drawer-toggle {
+.inventory-drawer-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.inventory-drawer-header h2 > svg {
+  flex: 0 0 auto;
+  color: #557563;
+}
+
+.drawer-toggle {
   display: flex;
   min-width: 30px;
   min-height: 30px;
@@ -819,17 +1130,52 @@ h1 {
   line-height: 1;
   transition:
     background 180ms ease,
-    transform 350ms cubic-bezier(0.22, 1, 0.36, 1);
+    transform 200ms cubic-bezier(0.2, 0.75, 0.25, 1);
 }
 
-.mission-tracks.is-collapsed .mission-drawer-toggle {
-  min-width: 26px;
-  min-height: 30px;
-  padding: 2px;
+.mission-drawer-toggle {
+  border-color: #d5c9b7;
+  background: #e9e2d6;
+  color: #4a4a43;
+}
+
+.inventory-drawer-toggle {
+  border-color: #c6d5ca;
+  background: #e1ebe3;
+  color: #48604e;
+}
+
+.drawer-toggle-icons {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.mission-tracks.is-collapsed .drawer-toggle,
+.line-inventory-drawer.is-collapsed .drawer-toggle {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .mission-drawer-toggle:hover {
   background: #ddd2c2;
+}
+
+.inventory-drawer-toggle:hover {
+  background: #d6e3d9;
+}
+
+.mission-tracks.is-collapsed .mission-drawer-toggle:hover,
+.line-inventory-drawer.is-collapsed .inventory-drawer-toggle:hover {
+  background: transparent;
 }
 
 .mission-drawer-toggle:focus-visible {
@@ -840,9 +1186,10 @@ h1 {
 .mission-track-list {
   display: flex;
   min-height: 0;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 10px;
-  max-height: min(70vh, 610px);
+  max-height: min(48vh, 440px);
   padding: 3px 8px 3px 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -853,9 +1200,147 @@ h1 {
   scrollbar-width: thin;
   transform: translateX(0);
   transition:
-    max-height 480ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 230ms ease,
-    transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
+    max-height 240ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    opacity 160ms ease,
+    transform 200ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.inventory-item-list {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  max-height: min(19vh, 170px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #aab9ad transparent;
+  scrollbar-width: thin;
+  transition:
+    max-height 220ms ease,
+    opacity 150ms ease,
+    transform 200ms ease;
+}
+
+.drawer-toggle:focus-visible {
+  outline: 3px solid rgb(85 117 99 / 35%);
+  outline-offset: 2px;
+}
+
+.inventory-item-card {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid #d4dfd5;
+  border-radius: 8px;
+  background: #fbfdf9;
+}
+
+.inventory-item-overview {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.inventory-item-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border: 1px solid #ead8c4;
+  border-radius: 7px;
+  background: #f7eee2;
+  color: #9a5a39;
+}
+
+.inventory-item-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.inventory-item-category {
+  color: #68816d;
+  font-size: 7px;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+}
+
+.inventory-item-copy strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inventory-item-copy > span:last-child {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.inventory-item-count {
+  color: #557563;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.inventory-item-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.inventory-item-status {
+  color: var(--muted);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.inventory-item-status.is-active {
+  color: #367250;
+}
+
+.inventory-item-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.inventory-action-button {
+  min-height: 27px;
+  padding: 4px 8px;
+  border: 1px solid #78917d;
+  border-radius: 6px;
+  background: #557563;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.inventory-use-button {
+  border-color: #cbd8cd;
+  background: #e6eee6;
+  color: #465b4a;
+}
+
+.inventory-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.inventory-action-button:focus-visible {
+  outline: 3px solid rgb(85 117 99 / 35%);
+  outline-offset: 2px;
 }
 
 .mission-track-list::-webkit-scrollbar {
@@ -873,18 +1358,31 @@ h1 {
   background-clip: padding-box;
 }
 
-.mission-tracks.is-collapsed .mission-drawer-header {
+.mission-tracks.is-collapsed .mission-drawer-header,
+.line-inventory-drawer.is-collapsed .inventory-drawer-header {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
   min-height: 0;
   justify-content: center;
-  padding: 8px 4px;
+  padding: 0;
 }
 
 .mission-tracks.is-collapsed .mission-track-list {
   max-height: 0;
+  padding: 0;
   overflow: hidden;
   opacity: 0;
   pointer-events: none;
   transform: translateX(16px);
+}
+
+.line-inventory-drawer.is-collapsed .inventory-item-list {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .mission-tracks.is-collapsed .mission-drawer-title {
@@ -893,6 +1391,13 @@ h1 {
   max-width: 0;
   opacity: 0;
   transform: translateX(12px);
+  pointer-events: none;
+}
+
+.line-inventory-drawer.is-collapsed .inventory-drawer-title {
+  display: none;
+  width: 0;
+  opacity: 0;
   pointer-events: none;
 }
 
@@ -907,7 +1412,6 @@ h1 {
   background: #fffefa;
   box-shadow: 0 3px 10px rgb(46 48 44 / 7%);
   color: var(--ink);
-  animation: mission-card-enter 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .skill-mission::before {
@@ -1161,9 +1665,16 @@ h1 {
 }
 
 .panel-heading {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.panel-heading-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .panel-kicker {
@@ -1185,6 +1696,93 @@ h2 {
   border-radius: 6px;
   color: var(--muted);
   font-size: 8px;
+}
+
+.market-details {
+  position: relative;
+  z-index: 15;
+}
+
+.market-details-trigger {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.market-details-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.market-details-trigger:focus-visible {
+  outline: 3px solid rgb(196 92 69 / 35%);
+  outline-offset: 2px;
+}
+
+.market-summary-separator {
+  color: var(--muted-light);
+}
+
+.market-details-chevron {
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 180ms ease;
+}
+
+.market-details[open] .market-details-chevron {
+  transform: translateY(1px) rotate(225deg);
+}
+
+.market-details-popover {
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  z-index: 15;
+  display: grid;
+  width: min(290px, calc(100vw - 30px));
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px rgb(46 48 44 / 16%);
+  animation: market-details-enter 180ms ease-out both;
+}
+
+.market-details:not([open]) > .market-details-popover {
+  display: none;
+}
+
+.market-details-title {
+  font-size: 12px;
+}
+
+.market-details-popover .price-label {
+  display: block;
+}
+
+@keyframes market-details-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .assembly-floor {
@@ -1368,7 +1966,7 @@ h2 {
 
 .market-tools {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: 6px;
   margin-top: 8px;
@@ -1687,6 +2285,13 @@ h2 {
     overflow: hidden;
   }
 
+  .line-side-panels {
+    top: max(84px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: min(350px, calc(100vw - 28px));
+  }
+
   .factory-content {
     display: flex;
     min-height: 0;
@@ -1730,6 +2335,31 @@ h2 {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 10px;
     margin-top: 8px;
+  }
+
+  .line-management {
+    gap: 6px;
+    margin-top: 7px;
+    padding-top: 7px;
+  }
+
+  .line-management-card {
+    gap: 5px;
+    padding: 6px;
+  }
+
+  .line-management-copy strong {
+    font-size: 9px;
+  }
+
+  .line-management-copy > span {
+    font-size: 7px;
+  }
+
+  .line-management-button {
+    min-height: 25px;
+    padding: 3px 4px;
+    font-size: 8px;
   }
 
   .line-section-heading {
@@ -1791,12 +2421,19 @@ h2 {
   }
 
   .mission-tracks {
-    width: min(350px, calc(100vw - 48px));
-    max-height: min(76vh, 680px);
+    max-height: min(52vh, 480px);
   }
 
   .mission-track-list {
-    max-height: min(66vh, 570px);
+    max-height: min(43vh, 400px);
+  }
+
+  .line-inventory-drawer {
+    max-height: min(24vh, 210px);
+  }
+
+  .inventory-item-list {
+    max-height: min(16vh, 140px);
   }
 
   .line-section {
@@ -1811,6 +2448,10 @@ h2 {
 @media (max-width: 420px) {
   .factory-shell {
     width: min(100% - 28px, 560px);
+  }
+
+  .line-side-panels {
+    width: min(330px, calc(100vw - 24px));
   }
 
   .topbar {
@@ -1846,6 +2487,62 @@ h2 {
 
   .panel {
     padding: 10px;
+  }
+
+  .assembly-floor {
+    height: 82px;
+    margin: 7px 0 4px;
+  }
+
+  .line-layout {
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .line-management {
+    gap: 5px;
+    margin-top: 5px;
+    padding-top: 5px;
+  }
+
+  .line-management-card {
+    gap: 4px;
+    padding: 5px;
+  }
+
+  .line-management-icon {
+    width: 20px;
+    height: 20px;
+    flex-basis: 20px;
+    font-size: 12px;
+  }
+
+  .line-management-card-heading {
+    gap: 4px;
+  }
+
+  .line-management-copy strong {
+    font-size: 8px;
+  }
+
+  .line-management-copy > span {
+    font-size: 7px;
+  }
+
+  .line-management-button {
+    min-height: 23px;
+    padding: 2px 3px;
+    font-size: 7px;
+  }
+
+  .market-details-popover {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .market-details-title,
+  .market-details-popover .demand-breakdown {
+    display: none;
   }
 
   .event-toast-stack {
@@ -1889,12 +2586,40 @@ h2 {
   }
 
   .mission-tracks {
-    width: min(330px, calc(100vw - 44px));
-    max-height: min(78vh, 650px);
+    max-height: min(52vh, 480px);
   }
 
   .mission-track-list {
-    max-height: min(68vh, 540px);
+    max-height: min(43vh, 400px);
+  }
+
+  .line-inventory-drawer {
+    max-height: min(24vh, 210px);
+    padding: 9px;
+    gap: 6px;
+  }
+
+  .inventory-item-list {
+    max-height: min(16vh, 140px);
+  }
+
+  .inventory-item-card {
+    padding: 7px;
+    gap: 6px;
+  }
+
+  .inventory-item-copy strong {
+    font-size: 10px;
+  }
+
+  .inventory-item-copy > span:last-child {
+    font-size: 8px;
+  }
+
+  .inventory-action-button {
+    min-height: 24px;
+    padding: 3px 6px;
+    font-size: 8px;
   }
 
   .market-tools {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { InventoryDrawer } from './components/InventoryDrawer'
 import { MissionDrawer } from './components/MissionDrawer'
 import { SaveDialog } from './components/SaveDialog'
 import {
@@ -30,6 +31,8 @@ import type {
   FactoryState,
   GameEvent,
   GameEventReward,
+  ProductionLineState,
+  ProductionLineView,
 } from './game/types'
 import './App.css'
 
@@ -64,6 +67,12 @@ const GAME_EVENT_DURATION_MS = 15_000
 const GAME_EVENT_EFFECT_DURATIONS_MS = [30_000, 45_000, 60_000, 90_000]
 const CASH_EVENT_MIN_REWARD_CENTS = 5_000
 const BASE_EVENT_DEMAND_BONUS_PERCENT = 50
+const DEMAND_BOOST_ITEM_COST_CENTS = 5_000
+const DEMAND_BOOST_PERCENT = 100
+const DEMAND_BOOST_DURATION_MS = 60_000
+const LINE_INVESTMENT_BASE_COST_CENTS = 25_000
+const LINE_INVESTMENT_COST_GROWTH = 1.5
+const LINE_INVESTMENT_PRODUCTION_PERCENT = 10
 
 type ProductionAnimation = {
   id: number
@@ -125,17 +134,32 @@ function getMarketingAgentCostCents(agents: number) {
 }
 
 function getFactoryNetWorthCents(factory: FactoryState) {
-  const inventoryValue = getCappedMoneyAmount(
-    factory.inventory * factory.priceCents,
-  )
+  return factory.lines.reduce((netWorth, line) => {
+    const lineAssets =
+      getCappedMoneyAmount(line.inventory * line.priceCents) +
+      getWorkerInvestmentCents(line.workers) +
+      getMarketingAgentInvestmentCents(line.marketingAgents) +
+      getMissionInvestmentCents(line.workerSkills, 'worker') +
+      getMissionInvestmentCents(line.demandSkills, 'demand') +
+      getMissionInvestmentCents(line.operationsSkills, 'operations') +
+      getLineInvestmentValueCents(line.investmentLevel) +
+      line.inventoryItems.demandBoost * DEMAND_BOOST_ITEM_COST_CENTS
+    return getCappedMoneyAmount(netWorth + lineAssets)
+  }, factory.cashCents)
+}
+
+function getLineInvestmentCostCents(level: number) {
   return getCappedMoneyAmount(
-    factory.cashCents +
-      inventoryValue +
-      getWorkerInvestmentCents(factory.workers) +
-      getMarketingAgentInvestmentCents(factory.marketingAgents) +
-      getMissionInvestmentCents(factory.workerSkills, 'worker') +
-      getMissionInvestmentCents(factory.demandSkills, 'demand') +
-      getMissionInvestmentCents(factory.operationsSkills, 'operations'),
+    LINE_INVESTMENT_BASE_COST_CENTS * LINE_INVESTMENT_COST_GROWTH ** level,
+  )
+}
+
+function getLineInvestmentValueCents(level: number) {
+  if (level <= 0) return 0
+  return getCappedMoneyAmount(
+    (LINE_INVESTMENT_BASE_COST_CENTS *
+      (LINE_INVESTMENT_COST_GROWTH ** level - 1)) /
+      (LINE_INVESTMENT_COST_GROWTH - 1),
   )
 }
 
@@ -308,14 +332,16 @@ function getWorkerCostCents(workers: number, discountPercent = 0) {
 
 function App() {
   const [initialSave] = useState(readLocalSave)
-  const [factory, setFactory] = useState(initialSave.factory)
+  const [factoryState, setFactoryState] = useState(initialSave.factory)
+  const [activeLineTab, setActiveLineTab] = useState('line-1')
   const [priceInput, setPriceInput] = useState(() =>
-    formatPriceInput(initialSave.factory.priceCents),
+    formatPriceInput(initialSave.factory.lines[0].priceCents),
   )
   const [productionAnimations, setProductionAnimations] = useState<
     ProductionAnimation[]
   >([])
   const [areMissionsCollapsed, setAreMissionsCollapsed] = useState(false)
+  const [isInventoryCollapsed, setIsInventoryCollapsed] = useState(true)
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false)
   const [saveText, setSaveText] = useState('')
   const [isSaveTextEdited, setIsSaveTextEdited] = useState(false)
@@ -329,9 +355,17 @@ function App() {
       getRandomEventDelay(FIRST_EVENT_MIN_DELAY_MS, FIRST_EVENT_MAX_DELAY_MS),
   )
   const [eventClock, setEventClock] = useState(Date.now())
-  const factoryForEvents = useRef(factory)
-  factoryForEvents.current = factory
+  const activeLineState =
+    factoryState.lines.find((line) => line.id === activeLineTab) ??
+    factoryState.lines[0]
+  const factory: ProductionLineView = {
+    ...activeLineState,
+    cashCents: factoryState.cashCents,
+  }
+  const factoryForEvents = useRef(factoryState)
+  factoryForEvents.current = factoryState
   const nextAnimationId = useRef(0)
+  const nextItemEffectId = useRef(0)
   const animationTimeouts = useRef(new Set<number>())
   const lastAnimatedProduction = useRef(factory.produced)
   const skillBonuses = getSkillBonuses(
@@ -341,7 +375,8 @@ function App() {
   const operationsBonuses = getOperationsBonuses(factory.operationsSkills)
   const productionPerSecond = getProductionRate(
     factory.workers,
-    skillBonuses.productionPercent,
+    skillBonuses.productionPercent +
+      factory.investmentLevel * LINE_INVESTMENT_PRODUCTION_PERCENT,
     factory.eventEffects,
     eventClock,
   )
@@ -354,6 +389,15 @@ function App() {
   const eventDemandBonusPercent = getEventDemandBonusPercent(
     factory.eventEffects,
     eventClock,
+  )
+  const investmentCostCents = getLineInvestmentCostCents(
+    factory.investmentLevel,
+  )
+  const isDemandBoostActive = factory.eventEffects.some(
+    (effect) =>
+      effect.target === 'demand' &&
+      effect.source === 'Campanha de demanda' &&
+      effect.expiresAt > eventClock,
   )
   const demandPercent = getDemandPercent(
     factory.priceCents,
@@ -391,7 +435,7 @@ function App() {
 
   useEffect(() => {
     try {
-      persistLocalSave(factory)
+      persistLocalSave(factoryState)
       setSaveMessage('Progresso salvo automaticamente neste navegador.')
     } catch (error) {
       console.error('Não foi possível salvar o progresso local.', error)
@@ -399,13 +443,13 @@ function App() {
         'Falha ao salvar neste navegador. Exporte o save para não perder o progresso.',
       )
     }
-  }, [factory])
+  }, [factoryState])
 
   useEffect(() => {
     if (isSaveDialogOpen && !isSaveTextEdited) {
-      setSaveText(createGameSaveJson(factory))
+      setSaveText(createGameSaveJson(factoryState))
     }
-  }, [factory, isSaveDialogOpen, isSaveTextEdited])
+  }, [factoryState, isSaveDialogOpen, isSaveTextEdited])
 
   function addProductionAnimations(quantity: number) {
     if (quantity <= 0) return
@@ -474,131 +518,156 @@ function App() {
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
-      setFactory((currentFactory) => {
-        const bonuses = getSkillBonuses(
-          currentFactory.workerSkills,
-          currentFactory.demandSkills,
-        )
+      setFactoryState((currentFactory) => {
         const now = Date.now()
-        const activeEffects = currentFactory.eventEffects.filter(
-          (effect) => effect.expiresAt > now,
-        )
-        const productionThisSecond =
-          currentFactory.productionProgress +
-          getProductionRate(
-            currentFactory.workers,
-            bonuses.productionPercent,
-            activeEffects,
-            now,
+        let cashCents = currentFactory.cashCents
+        const lines = currentFactory.lines.map((line) => {
+          const bonuses = getSkillBonuses(
+            line.workerSkills,
+            line.demandSkills,
           )
-        const producedThisSecond = Math.floor(productionThisSecond)
-        const inventoryAfterProduction =
-          currentFactory.inventory + producedThisSecond
-        const producedAfterTick = currentFactory.produced + producedThisSecond
-        const productionProgress = productionThisSecond - producedThisSecond
-        const demandPercent = getDemandPercent(
-          currentFactory.priceCents,
-          bonuses.demandPercent +
-            currentFactory.marketingAgents *
-              MARKETING_AGENT_DEMAND_BONUS_PERCENT +
-            getEventDemandBonusPercent(activeEffects, now),
-        )
-        const salesPerMinute = getSalesPerMinute(demandPercent)
-        if (inventoryAfterProduction === 0 || salesPerMinute === 0) {
+          const operations = getOperationsBonuses(line.operationsSkills)
+          const activeEffects = line.eventEffects.filter(
+            (effect) => effect.expiresAt > now,
+          )
+          const productionThisSecond =
+            line.productionProgress +
+            getProductionRate(
+              line.workers,
+              bonuses.productionPercent +
+                line.investmentLevel * LINE_INVESTMENT_PRODUCTION_PERCENT,
+              activeEffects,
+              now,
+            )
+          const producedThisSecond = Math.floor(productionThisSecond)
+          const inventoryAfterProduction = line.inventory + producedThisSecond
+          const producedAfterTick = line.produced + producedThisSecond
+          const productionProgress = productionThisSecond - producedThisSecond
+          const demandPercent = getDemandPercent(
+            line.priceCents,
+            bonuses.demandPercent +
+              line.marketingAgents * MARKETING_AGENT_DEMAND_BONUS_PERCENT +
+              getEventDemandBonusPercent(activeEffects, now),
+          )
+          const salesPerMinute = getSalesPerMinute(demandPercent)
+          if (inventoryAfterProduction === 0 || salesPerMinute === 0) {
+            return {
+              ...line,
+              inventory: inventoryAfterProduction,
+              produced: producedAfterTick,
+              eventEffects: activeEffects,
+              productionProgress,
+              demandProgress: 0,
+            }
+          }
+
+          const accumulatedDemand = line.demandProgress + salesPerMinute / 60
+          const orders = Math.floor(accumulatedDemand)
+          if (orders === 0) {
+            return {
+              ...line,
+              inventory: inventoryAfterProduction,
+              produced: producedAfterTick,
+              eventEffects: activeEffects,
+              productionProgress,
+              demandProgress: accumulatedDemand,
+            }
+          }
+
+          const soldNow = Math.min(inventoryAfterProduction, orders)
+          const unitRevenueCents = Math.round(
+            line.priceCents * (1 + operations.saleMarginPercent / 100),
+          )
+          cashCents = getCappedMoneyAmount(
+            cashCents + soldNow * unitRevenueCents,
+          )
           return {
-            ...currentFactory,
-            inventory: inventoryAfterProduction,
+            ...line,
+            inventory: inventoryAfterProduction - soldNow,
+            sold: line.sold + soldNow,
             produced: producedAfterTick,
             eventEffects: activeEffects,
             productionProgress,
-            demandProgress: 0,
+            demandProgress:
+              soldNow === inventoryAfterProduction
+                ? 0
+                : accumulatedDemand - orders,
           }
-        }
+        })
 
-        const accumulatedDemand =
-          currentFactory.demandProgress + salesPerMinute / 60
-        const orders = Math.floor(accumulatedDemand)
-        if (orders === 0) {
-          return {
-            ...currentFactory,
-            inventory: inventoryAfterProduction,
-            produced: producedAfterTick,
-            eventEffects: activeEffects,
-            productionProgress,
-            demandProgress: accumulatedDemand,
-          }
-        }
-
-        const soldNow = Math.min(inventoryAfterProduction, orders)
-        const unitRevenueCents = Math.round(
-          currentFactory.priceCents *
-            (1 + operationsBonuses.saleMarginPercent / 100),
-        )
         return {
           ...currentFactory,
-          inventory: inventoryAfterProduction - soldNow,
-          cashCents:
-            currentFactory.cashCents + soldNow * unitRevenueCents,
-          sold: currentFactory.sold + soldNow,
-          produced: producedAfterTick,
-          eventEffects: activeEffects,
-          productionProgress,
-          demandProgress:
-            soldNow === inventoryAfterProduction
-              ? 0
-              : accumulatedDemand - orders,
+          cashCents,
+          lines,
         }
       })
-
     }, 1000)
 
     return () => window.clearInterval(timerId)
-  }, [
-    factory.workers,
-    factory.marketingAgents,
-    skillBonuses.demandPercent,
-    skillBonuses.productionPercent,
-    operationsBonuses.saleMarginPercent,
-  ])
+  }, [])
+
+  function updateActiveLine(
+    update: (line: ProductionLineState) => ProductionLineState,
+  ) {
+    const activeLineId = factory.id
+    setFactoryState((currentFactory) => ({
+      ...currentFactory,
+      lines: currentFactory.lines.map((line) =>
+        line.id === activeLineId ? update(line) : line,
+      ),
+    }))
+  }
 
   function produceNut() {
     const quantity = 1 + operationsBonuses.manualProduction
-    setFactory((currentFactory) => ({
-      ...currentFactory,
-      inventory: currentFactory.inventory + quantity,
-      produced: currentFactory.produced + quantity,
+    updateActiveLine((line) => ({
+      ...line,
+      inventory: line.inventory + quantity,
+      produced: line.produced + quantity,
     }))
 
     addProductionAnimations(quantity)
   }
 
   function hireWorker() {
-    setFactory((currentFactory) => {
+    setFactoryState((currentFactory) => {
+      const line = currentFactory.lines.find(({ id }) => id === factory.id)
+      if (!line) return currentFactory
       const costCents = getWorkerCostCents(
-        currentFactory.workers,
-        operationsBonuses.workerDiscountPercent,
+        line.workers,
+        getOperationsBonuses(line.operationsSkills).workerDiscountPercent,
       )
       if (currentFactory.cashCents < costCents) return currentFactory
 
       return {
         ...currentFactory,
         cashCents: currentFactory.cashCents - costCents,
-        workers: currentFactory.workers + 1,
+        lines: currentFactory.lines.map((currentLine) =>
+          currentLine.id === line.id
+            ? { ...currentLine, workers: currentLine.workers + 1 }
+            : currentLine,
+        ),
       }
     })
   }
 
   function hireMarketingAgent() {
-    setFactory((currentFactory) => {
+    setFactoryState((currentFactory) => {
+      const line = currentFactory.lines.find(({ id }) => id === factory.id)
+      if (!line) return currentFactory
       const costCents = getMarketingAgentCostCents(
-        currentFactory.marketingAgents,
+        line.marketingAgents,
       )
       if (currentFactory.cashCents < costCents) return currentFactory
 
       return {
         ...currentFactory,
         cashCents: currentFactory.cashCents - costCents,
-        marketingAgents: currentFactory.marketingAgents + 1,
+        lines: currentFactory.lines.map((currentLine) =>
+          currentLine.id === line.id
+            ? { ...currentLine, marketingAgents: currentLine.marketingAgents + 1 }
+            : currentLine,
+        ),
       }
     })
   }
@@ -606,17 +675,19 @@ function App() {
   function unlockSkillMission(
     track: 'worker' | 'demand' | 'operations',
   ) {
-    setFactory((currentFactory) => {
+    setFactoryState((currentFactory) => {
+      const line = currentFactory.lines.find(({ id }) => id === factory.id)
+      if (!line) return currentFactory
       const mission =
         track === 'worker'
-          ? getWorkerMission(currentFactory.workerSkills + 1)
+          ? getWorkerMission(line.workerSkills + 1)
           : track === 'demand'
-            ? getDemandMission(currentFactory.demandSkills + 1)
-            : getOperationsMission(currentFactory.operationsSkills + 1)
+            ? getDemandMission(line.demandSkills + 1)
+            : getOperationsMission(line.operationsSkills + 1)
       const progress =
         mission.metric === 'produced'
-          ? currentFactory.produced
-          : currentFactory.sold
+          ? line.produced
+          : line.sold
       if (
         progress < mission.metricRequirement ||
         currentFactory.cashCents < mission.costCents
@@ -631,12 +702,90 @@ function App() {
             mission.costCents +
             (mission.rewardKind === 'cash' ? mission.rewardAmount : 0),
         ),
-        workerSkills:
-          currentFactory.workerSkills + (track === 'worker' ? 1 : 0),
-        demandSkills:
-          currentFactory.demandSkills + (track === 'demand' ? 1 : 0),
-        operationsSkills:
-          currentFactory.operationsSkills + (track === 'operations' ? 1 : 0),
+        lines: currentFactory.lines.map((currentLine) =>
+          currentLine.id === line.id
+            ? {
+                ...currentLine,
+                workerSkills:
+                  currentLine.workerSkills + (track === 'worker' ? 1 : 0),
+                demandSkills:
+                  currentLine.demandSkills + (track === 'demand' ? 1 : 0),
+                operationsSkills:
+                  currentLine.operationsSkills +
+                  (track === 'operations' ? 1 : 0),
+              }
+            : currentLine,
+        ),
+      }
+    })
+  }
+
+  function buyDemandBoost() {
+    setFactoryState((currentFactory) => {
+      const line = currentFactory.lines.find(({ id }) => id === factory.id)
+      if (!line || currentFactory.cashCents < DEMAND_BOOST_ITEM_COST_CENTS) {
+        return currentFactory
+      }
+
+      return {
+        ...currentFactory,
+        cashCents: currentFactory.cashCents - DEMAND_BOOST_ITEM_COST_CENTS,
+        lines: currentFactory.lines.map((currentLine) =>
+          currentLine.id === line.id
+            ? {
+                ...currentLine,
+                inventoryItems: {
+                  ...currentLine.inventoryItems,
+                  demandBoost: currentLine.inventoryItems.demandBoost + 1,
+                },
+              }
+            : currentLine,
+        ),
+      }
+    })
+  }
+
+  function useDemandBoost() {
+    const now = Date.now()
+    const effect: ActiveGameEffect = {
+      target: 'demand',
+      operation: 'add',
+      amount: DEMAND_BOOST_PERCENT,
+      durationMs: DEMAND_BOOST_DURATION_MS,
+      id: now * 100 + (nextItemEffectId.current++ % 100),
+      source: 'Campanha de demanda',
+      expiresAt: now + DEMAND_BOOST_DURATION_MS,
+    }
+    updateActiveLine((line) =>
+      line.inventoryItems.demandBoost > 0
+        ? {
+            ...line,
+            inventoryItems: {
+              ...line.inventoryItems,
+              demandBoost: line.inventoryItems.demandBoost - 1,
+            },
+            eventEffects: [...line.eventEffects, effect],
+          }
+        : line,
+    )
+    setEventClock(now)
+  }
+
+  function investInLine() {
+    setFactoryState((currentFactory) => {
+      const line = currentFactory.lines.find(({ id }) => id === factory.id)
+      if (!line) return currentFactory
+      const costCents = getLineInvestmentCostCents(line.investmentLevel)
+      if (currentFactory.cashCents < costCents) return currentFactory
+
+      return {
+        ...currentFactory,
+        cashCents: currentFactory.cashCents - costCents,
+        lines: currentFactory.lines.map((currentLine) =>
+          currentLine.id === line.id
+            ? { ...currentLine, investmentLevel: currentLine.investmentLevel + 1 }
+            : currentLine,
+        ),
       }
     })
   }
@@ -647,7 +796,7 @@ function App() {
     const now = Date.now()
     const reward = gameEvent.reward
     if (reward.target === 'cash') {
-      setFactory((currentFactory) => ({
+      setFactoryState((currentFactory) => ({
         ...currentFactory,
         cashCents: Math.min(
           Number.MAX_SAFE_INTEGER,
@@ -661,9 +810,13 @@ function App() {
         source: gameEvent.organization,
         expiresAt: now + reward.durationMs,
       }
-      setFactory((currentFactory) => ({
+      setFactoryState((currentFactory) => ({
         ...currentFactory,
-        eventEffects: [...currentFactory.eventEffects, effect],
+        lines: currentFactory.lines.map((line) =>
+          line.id === factory.id
+            ? { ...line, eventEffects: [...line.eventEffects, effect] }
+            : line,
+        ),
       }))
     }
 
@@ -673,7 +826,7 @@ function App() {
   }
 
   function changePrice(priceCents: number) {
-    setFactory((currentFactory) => ({ ...currentFactory, priceCents }))
+    updateActiveLine((line) => ({ ...line, priceCents }))
     setPriceInput(formatPriceInput(priceCents))
   }
 
@@ -689,7 +842,7 @@ function App() {
     ) {
       return
     }
-    setFactory((currentFactory) => ({ ...currentFactory, priceCents }))
+    updateActiveLine((line) => ({ ...line, priceCents }))
   }
 
   function commitPriceInput() {
@@ -707,7 +860,7 @@ function App() {
   }
 
   function openSaveDialog() {
-    setSaveText(createGameSaveJson(factory))
+    setSaveText(createGameSaveJson(factoryState))
     setIsSaveTextEdited(false)
     setIsSaveDialogOpen(true)
   }
@@ -715,11 +868,13 @@ function App() {
   function loadSaveText(text = saveText) {
     try {
       const importedFactory = parseGameSave(text)
-      setFactory(importedFactory)
+      const firstLine = importedFactory.lines[0]
+      setFactoryState(importedFactory)
+      setActiveLineTab(firstLine.id)
       setIsSaveTextEdited(false)
-      setPriceInput(formatPriceInput(importedFactory.priceCents))
+      setPriceInput(formatPriceInput(firstLine.priceCents))
       setProductionAnimations([])
-      lastAnimatedProduction.current = importedFactory.produced
+      lastAnimatedProduction.current = firstLine.produced
       setEventClock(Date.now())
       setGameEvent(null)
       setNextEventAt(
@@ -805,7 +960,10 @@ function App() {
         </button>
       </header>
 
-      <section className="factory-content" aria-labelledby="factory-title">
+      <section
+        className={`factory-content${activeLineTab === 'line-2' ? ' is-line-two' : ''}`}
+        aria-labelledby="factory-title"
+      >
         <div className="intro">
           <p className="eyebrow">SIMULADOR DE INDÚSTRIA · 01          </p>
           <h1 id="factory-title">
@@ -826,17 +984,157 @@ function App() {
         </section>
 
         <section
-          className="panel assembly-panel production-line"
+          className={`panel assembly-panel production-line${activeLineTab === 'line-2' ? ' is-second-line' : ''}`}
           aria-labelledby="line-title"
+          id="line-panel-1"
+          role="tabpanel"
         >
           <div className="panel-heading">
             <div>
-              <p className="panel-kicker">LINHA DE MONTAGEM 01</p>
-              <h2 id="line-title">Porcas</h2>
+              <nav className="line-tabs" role="tablist" aria-label="Linhas de montagem">
+                <span className="line-tabs-label">LINHA</span>
+                <button
+                  className={`line-tab${activeLineTab === 'line-1' ? ' is-active' : ''}`}
+                  type="button"
+                  role="tab"
+                  aria-label="Linha 1, Porcas"
+                  aria-selected={activeLineTab === 'line-1'}
+                  aria-controls="line-panel-1"
+                  onClick={() => setActiveLineTab('line-1')}
+                >
+                  01
+                </button>
+                <button
+                  className={`line-tab${activeLineTab === 'line-2' ? ' is-active' : ''}`}
+                  type="button"
+                  role="tab"
+                  id="line-2-tab"
+                  aria-label="Linha 2, em breve"
+                  aria-selected={activeLineTab === 'line-2'}
+                  aria-controls="line-panel-2"
+                  onClick={() => setActiveLineTab('line-2')}
+                >
+                  02
+                </button>
+              </nav>
+              <h2 id="line-title">
+                {activeLineTab === 'line-1' ? factory.name : 'Próxima linha'}
+              </h2>
             </div>
-            <span className="manual-tag">
-              {factory.workers > 0 ? 'AUTOMÁTICA' : 'MANUAL'}
-            </span>
+            <div className="panel-heading-tools">
+              {activeLineTab === 'line-1' ? (
+                <>
+                  <span className="manual-tag">
+                    {factory.workers > 0 ? 'AUTOMÁTICA' : 'MANUAL'}
+                  </span>
+                  <details className="market-details">
+                <summary
+                  className="market-details-trigger"
+                  aria-label={`Preço ${formatCurrency(factory.priceCents / 100)}, demanda ${formatPercent(demandPercent)}`}
+                >
+                  <span>{formatCurrency(factory.priceCents / 100)}</span>
+                  <span className="market-summary-separator" aria-hidden="true">
+                    ·
+                  </span>
+                  <span>{formatPercent(demandPercent)}</span>
+                  <span className="market-details-chevron" aria-hidden="true" />
+                </summary>
+                <div className="market-details-popover">
+                  <h3 className="market-details-title">Preço e demanda</h3>
+                  <div className="price-setting">
+                    <label
+                      className="price-label"
+                      htmlFor="price-input"
+                      title="Preço por porca"
+                    >
+                      Preço por porca
+                    </label>
+                    <div className="price-control">
+                      <span className="currency-prefix">R$</span>
+                      <input
+                        id="price-input"
+                        className="price-input"
+                        type="text"
+                        inputMode="decimal"
+                        value={priceInput}
+                        onChange={(event) =>
+                          handlePriceInputChange(event.target.value)
+                        }
+                        onBlur={commitPriceInput}
+                        aria-label="Preço por porca em reais"
+                      />
+                      <button
+                        className="price-step-button"
+                        type="button"
+                        onClick={() =>
+                          changePrice(
+                            Math.max(MIN_PRICE_CENTS, factory.priceCents - 1),
+                          )
+                        }
+                        disabled={factory.priceCents <= MIN_PRICE_CENTS}
+                        aria-label="Diminuir preço em um centavo"
+                      >
+                        ‹
+                      </button>
+                      <button
+                        className="price-step-button"
+                        type="button"
+                        onClick={() =>
+                          changePrice(
+                            Math.min(MAX_PRICE_CENTS, factory.priceCents + 1),
+                          )
+                        }
+                        disabled={factory.priceCents >= MAX_PRICE_CENTS}
+                        aria-label="Aumentar preço em um centavo"
+                      >
+                        ›
+                      </button>
+                    </div>
+                  </div>
+                  <div className="demand-box" aria-live="polite">
+                    <div className="demand-copy">
+                      <span className="demand-label">Demanda</span>
+                      <strong>{formatPercent(demandPercent)}</strong>
+                    </div>
+                    <span className="demand-breakdown">
+                      {formatPercent(priceDemandPercent)} pelo preço +{' '}
+                      {formatPercent(skillBonuses.demandPercent)} de habilidades
+                      {factory.marketingAgents > 0 &&
+                        ` + ${formatPercent(factory.marketingAgents * MARKETING_AGENT_DEMAND_BONUS_PERCENT)} de marketing`}
+                      {eventDemandBonusPercent > 0 &&
+                        ` + ${formatPercent(eventDemandBonusPercent)} de eventos`}
+                      {operationsBonuses.saleMarginPercent > 0 &&
+                        ` · margem +${formatPercent(operationsBonuses.saleMarginPercent)}`}
+                    </span>
+                    <span className="demand-sales-rate">
+                      {formatRate(salesPerMinute)} porcas / min
+                    </span>
+                    <div className="demand-meter" aria-hidden="true">
+                      <span style={{ width: `${demandMeterPercentage}%` }} />
+                    </div>
+                  </div>
+                </div>
+                  </details>
+                </>
+              ) : (
+                <span className="manual-tag">EM BREVE</span>
+              )}
+            </div>
+          </div>
+
+          <div
+            className="line-placeholder"
+            id="line-panel-2"
+            role="tabpanel"
+            aria-labelledby="line-2-tab"
+          >
+            <span className="line-placeholder-index">02</span>
+            <p className="panel-kicker">EXPANSÃO INDUSTRIAL</p>
+            <h3>Uma nova linha está a caminho</h3>
+            <p>
+              Cada linha terá seu próprio estoque, inventário e investimentos.
+            </p>
+            <span className="line-placeholder-status">EM BREVE</span>
           </div>
 
           <div className="line-layout">
@@ -999,109 +1297,67 @@ function App() {
                     </button>
                   </span>
                 </div>
-
-                <div className="price-setting">
-                  <label
-                    className="price-label"
-                    htmlFor="price-input"
-                    title="Preço por porca"
-                  >
-                    Preço
-                  </label>
-                  <div className="price-control">
-                    <span className="currency-prefix">R$</span>
-                    <input
-                      id="price-input"
-                      className="price-input"
-                      type="text"
-                      inputMode="decimal"
-                      value={priceInput}
-                      onChange={(event) =>
-                        handlePriceInputChange(event.target.value)
-                      }
-                      onBlur={commitPriceInput}
-                      aria-label="Preço por porca em reais"
-                    />
-                    <button
-                      className="price-step-button"
-                      type="button"
-                      onClick={() =>
-                        changePrice(
-                          Math.max(
-                            MIN_PRICE_CENTS,
-                            factory.priceCents - 1,
-                          ),
-                        )
-                      }
-                      disabled={factory.priceCents <= MIN_PRICE_CENTS}
-                      aria-label="Diminuir preço em um centavo"
-                    >
-                      ‹
-                    </button>
-                    <button
-                      className="price-step-button"
-                      type="button"
-                      onClick={() =>
-                        changePrice(
-                          Math.min(
-                            MAX_PRICE_CENTS,
-                            factory.priceCents + 1,
-                          ),
-                        )
-                      }
-                      disabled={factory.priceCents >= MAX_PRICE_CENTS}
-                      aria-label="Aumentar preço em um centavo"
-                    >
-                      ›
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="demand-box" aria-live="polite">
-                <div className="demand-copy">
-                  <span className="demand-label">Demanda</span>
-                  <strong>{formatPercent(demandPercent)}</strong>
-                </div>
-                <span className="demand-breakdown">
-                  {formatPercent(priceDemandPercent)} pelo preço +{' '}
-                  {formatPercent(skillBonuses.demandPercent)} de habilidades
-                  {factory.marketingAgents > 0 &&
-                    ` + ${formatPercent(factory.marketingAgents * MARKETING_AGENT_DEMAND_BONUS_PERCENT)} de marketing`}
-                  {eventDemandBonusPercent > 0 &&
-                    ` + ${formatPercent(eventDemandBonusPercent)} de eventos`}
-                  {operationsBonuses.saleMarginPercent > 0 &&
-                    ` · margem +${formatPercent(operationsBonuses.saleMarginPercent)}`}
-                </span>
-                <span className="demand-sales-rate">
-                  {formatRate(salesPerMinute)} porcas / min
-                </span>
-                <div
-                  className="demand-meter"
-                  aria-hidden="true"
-                >
-                  <span style={{ width: `${demandMeterPercentage}%` }} />
-                </div>
               </div>
             </section>
           </div>
 
         </section>
 
-        <MissionDrawer
-          factory={factory}
-          workerMission={nextWorkerMission}
-          demandMission={nextDemandMission}
-          operationsMission={nextOperationsMission}
-          canUnlockWorkerMission={canUnlockWorkerMission}
-          canUnlockDemandMission={canUnlockDemandMission}
-          canUnlockOperationsMission={canUnlockOperationsMission}
-          collapsed={areMissionsCollapsed}
-          onToggleCollapsed={() =>
-            setAreMissionsCollapsed((collapsed) => !collapsed)
-          }
-          onUnlock={unlockSkillMission}
-        />
+          <section
+            className="line-management"
+            aria-label={`Investimentos de ${factory.name}`}
+          >
+            <article className="line-management-card investment-card">
+              <div className="line-management-card-heading">
+                <span className="line-management-icon investment-icon" aria-hidden="true">
+                  ⚙
+                </span>
+                <div className="line-management-copy">
+                  <strong>Investir na linha</strong>
+                  <span>+{LINE_INVESTMENT_PRODUCTION_PERCENT}% produção automática / nível</span>
+                </div>
+                <span className="line-item-count">
+                  N{formatNumber(factory.investmentLevel)}
+                </span>
+              </div>
+              <button
+                className="line-management-button investment-button"
+                type="button"
+                onClick={investInLine}
+                disabled={factory.cashCents < investmentCostCents}
+                aria-label={`Investir na linha por ${formatCurrency(investmentCostCents / 100)}`}
+              >
+                Investir · {formatCurrency(investmentCostCents / 100)}
+              </button>
+            </article>
+          </section>
+        <div className="line-side-panels">
+          <MissionDrawer
+            factory={factory}
+            workerMission={nextWorkerMission}
+            demandMission={nextDemandMission}
+            operationsMission={nextOperationsMission}
+            canUnlockWorkerMission={canUnlockWorkerMission}
+            canUnlockDemandMission={canUnlockDemandMission}
+            canUnlockOperationsMission={canUnlockOperationsMission}
+            collapsed={areMissionsCollapsed}
+            onToggleCollapsed={() =>
+              setAreMissionsCollapsed((collapsed) => !collapsed)
+            }
+            onUnlock={unlockSkillMission}
+          />
+          <InventoryDrawer
+            line={factory}
+            demandBoostCostCents={DEMAND_BOOST_ITEM_COST_CENTS}
+            demandBoostActive={isDemandBoostActive}
+            collapsed={isInventoryCollapsed}
+            onToggleCollapsed={() =>
+              setIsInventoryCollapsed((collapsed) => !collapsed)
+            }
+            onBuyDemandBoost={buyDemandBoost}
+            onUseDemandBoost={useDemandBoost}
+          />
+        </div>
       </section>
 
       <footer className="page-footer">
@@ -1109,7 +1365,8 @@ function App() {
         <span>PRODUZA · PRECIFIQUE · VENDA</span>
       </footer>
 
-      {factory.eventEffects.some((effect) => effect.expiresAt > eventClock) && (
+      {activeLineTab === 'line-1' &&
+        factory.eventEffects.some((effect) => effect.expiresAt > eventClock) && (
         <section className="active-effects-list" aria-label="Habilidades ativas">
           {factory.eventEffects
             .filter((effect) => effect.expiresAt > eventClock)

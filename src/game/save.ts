@@ -3,11 +3,17 @@ import {
   MAX_PRICE_CENTS,
   MIN_PRICE_CENTS,
 } from './types'
-import type { ActiveGameEffect, FactoryState } from './types'
+import type {
+  ActiveGameEffect,
+  FactoryState,
+  ProductionLineState,
+} from './types'
 
 const SAVE_STORAGE_KEY = 'porca-works-save'
-const SAVE_VERSION = 1
+const SAVE_VERSION = 2
+const LEGACY_SAVE_VERSION = 1
 const MAX_SAVED_EFFECTS = 100
+const MAX_PRODUCTION_LINES = 8
 
 export type LocalSaveReadResult = {
   factory: FactoryState
@@ -92,57 +98,122 @@ function parseEffect(value: unknown): ActiveGameEffect {
   }
 }
 
-export function parseGameSave(text: string): FactoryState {
-  const parsed: unknown = JSON.parse(text)
-  if (!isRecord(parsed) || parsed.version !== SAVE_VERSION) {
-    throw new Error('O arquivo não é um save compatível do Porca Works.')
-  }
-
-  const factory = parsed.factory
+function parseProductionLine(
+  value: unknown,
+  fallbackId: string,
+): ProductionLineState {
+  const line = value
   if (
-    !isRecord(factory) ||
-    !isNonnegativeSafeInteger(factory.priceCents) ||
-    factory.priceCents < MIN_PRICE_CENTS ||
-    factory.priceCents > MAX_PRICE_CENTS ||
-    !isNonnegativeSafeInteger(factory.inventory) ||
-    !isNonnegativeSafeInteger(factory.cashCents) ||
-    !isNonnegativeSafeInteger(factory.sold) ||
-    !isNonnegativeSafeInteger(factory.produced) ||
-    !isNonnegativeSafeInteger(factory.workers) ||
-    (factory.marketingAgents !== undefined &&
-      !isNonnegativeSafeInteger(factory.marketingAgents)) ||
-    !isNonnegativeSafeInteger(factory.workerSkills) ||
-    !isNonnegativeSafeInteger(factory.demandSkills) ||
-    (factory.operationsSkills !== undefined &&
-      !isNonnegativeSafeInteger(factory.operationsSkills)) ||
-    !isValidProgress(factory.productionProgress) ||
-    !isValidProgress(factory.demandProgress) ||
-    !Array.isArray(factory.eventEffects) ||
-    factory.eventEffects.length > MAX_SAVED_EFFECTS
+    !isRecord(line) ||
+    !isNonnegativeSafeInteger(line.priceCents) ||
+    line.priceCents < MIN_PRICE_CENTS ||
+    line.priceCents > MAX_PRICE_CENTS ||
+    !isNonnegativeSafeInteger(line.inventory) ||
+    !isNonnegativeSafeInteger(line.sold) ||
+    !isNonnegativeSafeInteger(line.produced) ||
+    !isNonnegativeSafeInteger(line.workers) ||
+    (line.marketingAgents !== undefined &&
+      !isNonnegativeSafeInteger(line.marketingAgents)) ||
+    !isNonnegativeSafeInteger(line.workerSkills) ||
+    !isNonnegativeSafeInteger(line.demandSkills) ||
+    (line.operationsSkills !== undefined &&
+      !isNonnegativeSafeInteger(line.operationsSkills)) ||
+    !isValidProgress(line.productionProgress) ||
+    !isValidProgress(line.demandProgress) ||
+    !Array.isArray(line.eventEffects) ||
+    line.eventEffects.length > MAX_SAVED_EFFECTS ||
+    (line.id !== undefined &&
+      (typeof line.id !== 'string' || line.id.length === 0 || line.id.length > 80)) ||
+    (line.name !== undefined &&
+      (typeof line.name !== 'string' || line.name.length === 0 || line.name.length > 80)) ||
+    (line.investmentLevel !== undefined &&
+      !isNonnegativeSafeInteger(line.investmentLevel))
   ) {
     throw new Error('O save contém dados inválidos ou incompletos.')
   }
 
+  const inventoryItems = line.inventoryItems
+  if (
+    inventoryItems !== undefined &&
+    (!isRecord(inventoryItems) ||
+      !isNonnegativeSafeInteger(inventoryItems.demandBoost))
+  ) {
+    throw new Error('O save contém dados de inventário inválidos.')
+  }
+
   return {
-    priceCents: factory.priceCents,
-    inventory: factory.inventory,
-    cashCents: factory.cashCents,
-    sold: factory.sold,
-    produced: factory.produced,
-    workers: factory.workers,
-    marketingAgents: isNonnegativeSafeInteger(factory.marketingAgents)
-      ? factory.marketingAgents
+    id: typeof line.id === 'string' ? line.id : fallbackId,
+    name: typeof line.name === 'string' ? line.name : 'Porcas',
+    priceCents: line.priceCents,
+    inventory: line.inventory,
+    sold: line.sold,
+    produced: line.produced,
+    workers: line.workers,
+    marketingAgents: isNonnegativeSafeInteger(line.marketingAgents)
+      ? line.marketingAgents
       : 0,
-    workerSkills: factory.workerSkills,
-    demandSkills: factory.demandSkills,
-    operationsSkills: isNonnegativeSafeInteger(factory.operationsSkills)
-      ? factory.operationsSkills
+    workerSkills: line.workerSkills,
+    demandSkills: line.demandSkills,
+    operationsSkills: isNonnegativeSafeInteger(line.operationsSkills)
+      ? line.operationsSkills
       : 0,
-    eventEffects: factory.eventEffects
+    eventEffects: line.eventEffects
       .map(parseEffect)
       .filter((effect) => effect.expiresAt > Date.now()),
-    productionProgress: factory.productionProgress,
-    demandProgress: factory.demandProgress,
+    productionProgress: line.productionProgress,
+    demandProgress: line.demandProgress,
+    inventoryItems:
+      inventoryItems === undefined
+        ? { demandBoost: 0 }
+        : { demandBoost: inventoryItems.demandBoost as number },
+    investmentLevel: isNonnegativeSafeInteger(line.investmentLevel)
+      ? line.investmentLevel
+      : 0,
+  }
+}
+
+export function parseGameSave(text: string): FactoryState {
+  const parsed: unknown = JSON.parse(text)
+  if (!isRecord(parsed)) {
+    throw new Error('O arquivo não é um save compatível do Porca Works.')
+  }
+
+  const savedFactory = parsed.factory
+  if (parsed.version === LEGACY_SAVE_VERSION) {
+    if (
+      !isRecord(savedFactory) ||
+      !isNonnegativeSafeInteger(savedFactory.cashCents)
+    ) {
+      throw new Error('O save antigo contém dados inválidos ou incompletos.')
+    }
+
+    return {
+      cashCents: savedFactory.cashCents,
+      lines: [parseProductionLine(savedFactory, 'line-1')],
+    }
+  }
+
+  if (
+    parsed.version !== SAVE_VERSION ||
+    !isRecord(savedFactory) ||
+    !isNonnegativeSafeInteger(savedFactory.cashCents) ||
+    !Array.isArray(savedFactory.lines) ||
+    savedFactory.lines.length === 0 ||
+    savedFactory.lines.length > MAX_PRODUCTION_LINES
+  ) {
+    throw new Error('O arquivo não é um save compatível do Porca Works.')
+  }
+
+  const lines = savedFactory.lines.map((line, index) =>
+    parseProductionLine(line, `line-${index + 1}`),
+  )
+  if (new Set(lines.map((line) => line.id)).size !== lines.length) {
+    throw new Error('O save contém linhas de montagem duplicadas.')
+  }
+
+  return {
+    cashCents: savedFactory.cashCents,
+    lines,
   }
 }
 
