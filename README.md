@@ -11,22 +11,24 @@ preço e a demanda da linha. O caixa é acompanhado no resumo da fábrica.
 - Contrate trabalhadores pelo botão na seção de produção. Cada trabalhador
   custa R$ 100,00 inicialmente e produz uma porca por segundo. O preço de cada
   nova contratação aumenta 15%.
-- Há duas trilhas independentes de missões, ambas progredindo com o total de
-  porcas produzidas:
-  - **Trabalhadores**: as habilidades aumentam a produção de cada trabalhador.
-    A primeira, **Trabalhador Eficiente**, exige 1.500 porcas e R$ 150,00, e dá
-    +15% de produção.
-  - **Demanda**: as habilidades aumentam diretamente o percentual de demanda da
-    linha, mesmo sem alterar o preço. A primeira exige 1.500 porcas e R$ 300,00,
-    e adiciona 50 pontos percentuais. Cada nova habilidade adiciona mais 50
-    pontos percentuais cumulativos.
-- Cada trilha gera missões únicas em sequência, com nomes e recompensas
-  diferentes. É preciso cumprir a meta de produção e pagar o custo exibido
-  para desbloquear cada habilidade. Requisitos, custos e bônus aumentam por
-  nível; os bônus desbloqueados são cumulativos.
-- As duas próximas missões aparecem em um painel retrátil no lado direito da
-  tela, com progresso e opção de desbloqueio. Recolha o painel pela seta para
-  deixar apenas uma pequena seta na borda direita.
+- A campanha tem três trilhas independentes, cada uma com objetivos próprios:
+  - **Trabalhadores**: contratos de capacidade exigem produzir porcas e pagar
+    o investimento indicado. O primeiro exige 1.800 porcas e R$ 180,00; as
+    recompensas aumentam a produção por trabalhador.
+  - **Mercado**: contratos de distribuição exigem vender porcas e pagar o
+    investimento indicado. O primeiro exige 1.000 vendas e R$ 350,00; as
+    recompensas aumentam a demanda sem alterar o preço.
+- **Gestão**: contratos alternam metas de produção e vendas. As recompensas
+  incluem mais porcas por clique, desconto na contratação de trabalhadores,
+  margem adicional por venda e bônus imediato em caixa. O contrato de gestão
+  aparece após produzir 2.500 porcas e custa R$ 450,00.
+- Os contratos têm nomes, contexto e metas próprias, e avançam em uma curva
+  crescente de requisitos e custos. As metas desbloqueadas continuam
+  cumulativas; após a campanha inicial, novos ciclos industriais mantêm a
+  progressão.
+- Os próximos contratos aparecem em um painel retrátil no lado direito da
+  tela, com descrição, progresso da métrica correspondente e opção de
+  assinatura. Recolha o painel pela seta para deixar apenas uma pequena seta.
 - Ajuste o preço da linha entre R$ 0,01 e R$ 100,00 em incrementos de um
   centavo, usando o campo ou os botões de ajuste. Cada porca começa custando
   R$ 0,10.
@@ -86,6 +88,13 @@ npm run preview
 
 ## Estrutura
 
-- `src/App.tsx`: interface e lógica da partida.
+- `src/App.tsx`: composição da fábrica e ciclo principal da partida.
+- `src/game/missions.ts`: campanhas, requisitos, custos e bônus dos contratos.
+- `src/game/save.ts`: validação, importação e persistência dos saves.
+- `src/game/format.ts`: formatação compartilhada de valores para pt-BR.
+- `src/game/types.ts`: tipos e estado inicial da fábrica.
+- `src/components/MissionDrawer.tsx`: painel e cartões dos contratos.
+- `src/components/SaveDialog.tsx`: interface de exportação e carregamento dos
+  saves.
 - `src/App.css`: estilos do jogo.
 - `src/index.css`: estilos globais e variáveis de tema.

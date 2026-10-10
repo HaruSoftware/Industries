@@ -924,6 +924,10 @@ h1 {
   background: #668d91;
 }
 
+.operations-mission::before {
+  background: #77865e;
+}
+
 .skill-mission:nth-child(2) {
   animation-delay: 90ms;
 }
@@ -938,12 +942,23 @@ h1 {
   color: #527a7e;
 }
 
+.operations-mission .skill-mission-info .panel-kicker {
+  color: #65744d;
+}
+
 .skill-mission-info h2 {
   margin: 0;
   color: var(--ink);
   font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.02em;
+}
+
+.mission-briefing {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
 }
 
 .skill-reward {
@@ -962,6 +977,12 @@ h1 {
   border-color: #d8e5e3;
   background: #edf4f2;
   color: #45696b;
+}
+
+.operations-mission .skill-reward {
+  border-color: #dce4d2;
+  background: #f0f4e9;
+  color: #596747;
 }
 
 .skill-progress {
@@ -988,6 +1009,10 @@ h1 {
 
 .demand-mission .skill-progress-track span {
   background: #668d91;
+}
+
+.operations-mission .skill-progress-track span {
+  background: #77865e;
 }
 
 .skill-progress > span {

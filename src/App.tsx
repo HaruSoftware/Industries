@@ -1,11 +1,38 @@
 import { useEffect, useRef, useState } from 'react'
+import { MissionDrawer } from './components/MissionDrawer'
+import { SaveDialog } from './components/SaveDialog'
+import {
+  getDemandMission,
+  getFactoryMissionInvestmentCents,
+  getOperationsBonuses,
+  getOperationsMission,
+  getSkillBonuses,
+  getWorkerMission,
+} from './game/missions'
+import {
+  formatCurrency,
+  formatNumber,
+  formatPercent,
+  formatRate,
+} from './game/format'
+import {
+  createGameSaveJson,
+  parseGameSave,
+  persistLocalSave,
+  readLocalSave,
+} from './game/save'
+import {
+  MAX_PRICE_CENTS,
+  MIN_PRICE_CENTS,
+} from './game/types'
+import type {
+  ActiveGameEffect,
+  FactoryState,
+  GameEvent,
+  GameEventReward,
+} from './game/types'
 import './App.css'
 
-const SAVE_STORAGE_KEY = 'porca-works-save'
-const SAVE_VERSION = 1
-const MAX_SAVED_EFFECTS = 100
-const MIN_PRICE_CENTS = 1
-const MAX_PRICE_CENTS = 10_000
 const REFERENCE_PRICE_CENTS = 10
 const REFERENCE_DEMAND_PER_MINUTE = 60
 const REFERENCE_DEMAND_PERCENT = 100
@@ -26,8 +53,6 @@ const WORKER_COST_GROWTH = 1.15
 const MAX_VISIBLE_PRODUCTION_ANIMATIONS = 8
 const PRODUCTION_ANIMATION_DURATION_MS = 850
 const PRODUCTION_ANIMATION_STAGGER_MS = 65
-const FIRST_SKILL_COST_CENTS = 15_000
-const FIRST_SKILL_PRODUCTION_REQUIREMENT = 1_500
 const FIRST_EVENT_MIN_DELAY_MS = 45_000
 const FIRST_EVENT_MAX_DELAY_MS = 90_000
 const MIN_EVENT_DELAY_MS = 60_000
@@ -40,239 +65,6 @@ const BASE_EVENT_DEMAND_BONUS_PERCENT = 50
 type ProductionAnimation = {
   id: number
   quantities: number[]
-}
-
-type ProductionEventReward = {
-  target: 'production-rate'
-  operation: 'add' | 'multiply'
-  amount: number
-  durationMs: number
-}
-
-type DemandEventReward = {
-  target: 'demand'
-  operation: 'add'
-  amount: number
-  durationMs: number
-}
-
-type CashEventReward = {
-  target: 'cash'
-  operation: 'add'
-  amount: number
-}
-
-type TimedGameEventReward = ProductionEventReward | DemandEventReward
-type GameEventReward = TimedGameEventReward | CashEventReward
-
-type ActiveGameEffect = TimedGameEventReward & {
-  id: number
-  source: string
-  expiresAt: number
-}
-
-type GameEvent = {
-  id: number
-  organization: string
-  message: string
-  reward: GameEventReward
-  createdAt: number
-  expiresAt: number
-}
-
-type SkillMission = {
-  name: string
-  productionRequirement: number
-  costCents: number
-  reward: string
-}
-
-type SkillBonuses = {
-  productionPercent: number
-  demandPercent: number
-}
-
-type FactoryState = {
-  priceCents: number
-  inventory: number
-  cashCents: number
-  sold: number
-  produced: number
-  workers: number
-  workerSkills: number
-  demandSkills: number
-  eventEffects: ActiveGameEffect[]
-  productionProgress: number
-  demandProgress: number
-}
-
-type GameSave = {
-  version: typeof SAVE_VERSION
-  savedAt: number
-  factory: FactoryState
-}
-
-type LocalSaveReadResult = {
-  factory: FactoryState
-  error: string | null
-}
-
-const initialFactoryState: FactoryState = {
-  priceCents: 10,
-  inventory: 0,
-  cashCents: 0,
-  sold: 0,
-  produced: 0,
-  workers: 0,
-  workerSkills: 0,
-  demandSkills: 0,
-  eventEffects: [],
-  productionProgress: 0,
-  demandProgress: 0,
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-function isNonnegativeSafeInteger(value: unknown): value is number {
-  return (
-    typeof value === 'number' &&
-    Number.isSafeInteger(value) &&
-    value >= 0
-  )
-}
-
-function isValidProgress(value: unknown): value is number {
-  return (
-    typeof value === 'number' &&
-    Number.isFinite(value) &&
-    value >= 0 &&
-    value < 1
-  )
-}
-
-function parseGameSave(text: string): FactoryState {
-  const parsed: unknown = JSON.parse(text)
-  if (!isRecord(parsed) || parsed.version !== SAVE_VERSION) {
-    throw new Error('O arquivo não é um save compatível do Porca Works.')
-  }
-
-  const factory = parsed.factory
-  if (
-    !isRecord(factory) ||
-    !isNonnegativeSafeInteger(factory.priceCents) ||
-    factory.priceCents < MIN_PRICE_CENTS ||
-    factory.priceCents > MAX_PRICE_CENTS ||
-    !isNonnegativeSafeInteger(factory.inventory) ||
-    !isNonnegativeSafeInteger(factory.cashCents) ||
-    !isNonnegativeSafeInteger(factory.sold) ||
-    !isNonnegativeSafeInteger(factory.produced) ||
-    !isNonnegativeSafeInteger(factory.workers) ||
-    !isNonnegativeSafeInteger(factory.workerSkills) ||
-    !isNonnegativeSafeInteger(factory.demandSkills) ||
-    !isValidProgress(factory.productionProgress) ||
-    !isValidProgress(factory.demandProgress) ||
-    !Array.isArray(factory.eventEffects) ||
-    factory.eventEffects.length > MAX_SAVED_EFFECTS
-  ) {
-    throw new Error('O save contém dados inválidos ou incompletos.')
-  }
-
-  const eventEffects: ActiveGameEffect[] = factory.eventEffects.map(
-    (effect): ActiveGameEffect => {
-      if (
-        !isRecord(effect) ||
-        (effect.target !== 'production-rate' && effect.target !== 'demand') ||
-        (effect.target === 'production-rate' &&
-          effect.operation !== 'add' &&
-          effect.operation !== 'multiply') ||
-        (effect.target === 'demand' && effect.operation !== 'add') ||
-        typeof effect.amount !== 'number' ||
-        !Number.isFinite(effect.amount) ||
-        effect.amount <= 0 ||
-        typeof effect.durationMs !== 'number' ||
-        !Number.isFinite(effect.durationMs) ||
-        effect.durationMs <= 0 ||
-        !isNonnegativeSafeInteger(effect.id) ||
-        typeof effect.source !== 'string' ||
-        effect.source.length > 200 ||
-        typeof effect.expiresAt !== 'number' ||
-        !Number.isFinite(effect.expiresAt)
-      ) {
-        throw new Error('O save contém um bônus ativo inválido.')
-      }
-
-      if (effect.target === 'demand') {
-        return {
-          target: 'demand',
-          operation: 'add',
-          amount: effect.amount,
-          durationMs: effect.durationMs,
-          id: effect.id,
-          source: effect.source,
-          expiresAt: effect.expiresAt,
-        }
-      }
-
-      const operation = effect.operation
-      if (operation !== 'add' && operation !== 'multiply') {
-        throw new Error('O save contém um bônus ativo inválido.')
-      }
-
-      return {
-        target: 'production-rate',
-        operation,
-        amount: effect.amount,
-        durationMs: effect.durationMs,
-        id: effect.id,
-        source: effect.source,
-        expiresAt: effect.expiresAt,
-      }
-    },
-  )
-
-  return {
-    priceCents: factory.priceCents,
-    inventory: factory.inventory,
-    cashCents: factory.cashCents,
-    sold: factory.sold,
-    produced: factory.produced,
-    workers: factory.workers,
-    workerSkills: factory.workerSkills,
-    demandSkills: factory.demandSkills,
-    eventEffects: eventEffects.filter(
-      (effect) => effect.expiresAt > Date.now(),
-    ),
-    productionProgress: factory.productionProgress,
-    demandProgress: factory.demandProgress,
-  }
-}
-
-function createGameSaveJson(factory: FactoryState) {
-  const save: GameSave = {
-    version: SAVE_VERSION,
-    savedAt: Date.now(),
-    factory,
-  }
-  return JSON.stringify(save, null, 2)
-}
-
-function readLocalSave(): LocalSaveReadResult {
-  try {
-    const savedText = window.localStorage.getItem(SAVE_STORAGE_KEY)
-    if (!savedText) return { factory: initialFactoryState, error: null }
-    return { factory: parseGameSave(savedText), error: null }
-  } catch (error) {
-    console.error('Não foi possível carregar o save local.', error)
-    return {
-      factory: initialFactoryState,
-      error:
-        error instanceof Error
-          ? `Falha ao carregar save local: ${error.message}`
-          : 'Falha ao carregar save local.',
-    }
-  }
 }
 
 const EVENT_ORGANIZATIONS = [
@@ -297,11 +89,11 @@ function getCappedMoneyAmount(value: number) {
   return Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.round(value)))
 }
 
-function getMissionInvestmentCents(level: number, multiplier = 1) {
-  const cumulativeLevelSquares = (level * (level + 1) * (2 * level + 1)) / 6
-  return getCappedMoneyAmount(
-    FIRST_SKILL_COST_CENTS * multiplier * cumulativeLevelSquares,
-  )
+function getMissionInvestmentCents(
+  level: number,
+  track: 'worker' | 'demand' | 'operations',
+) {
+  return getFactoryMissionInvestmentCents(level, track)
 }
 
 function getWorkerInvestmentCents(workers: number) {
@@ -321,8 +113,9 @@ function getFactoryNetWorthCents(factory: FactoryState) {
     factory.cashCents +
       inventoryValue +
       getWorkerInvestmentCents(factory.workers) +
-      getMissionInvestmentCents(factory.workerSkills) +
-      getMissionInvestmentCents(factory.demandSkills, 2),
+      getMissionInvestmentCents(factory.workerSkills, 'worker') +
+      getMissionInvestmentCents(factory.demandSkills, 'demand') +
+      getMissionInvestmentCents(factory.operationsSkills, 'operations'),
   )
 }
 
@@ -482,91 +275,15 @@ function getSalesPerMinute(demandPercent: number) {
   return demandPercent * SALES_PER_MINUTE_PER_DEMAND_PERCENT
 }
 
-function getWorkerCostCents(workers: number) {
-  return Math.round(FIRST_WORKER_COST_CENTS * WORKER_COST_GROWTH ** workers)
-}
-
-function getMissionProductionRequirement(number: number) {
-  return Math.min(
-    Number.MAX_SAFE_INTEGER,
-    FIRST_SKILL_PRODUCTION_REQUIREMENT * number,
-  )
-}
-
-function getMissionCostCents(number: number, multiplier = 1) {
-  return Math.min(
-    Number.MAX_SAFE_INTEGER,
-    FIRST_SKILL_COST_CENTS * multiplier * number ** 2,
-  )
-}
-
-function getWorkerMission(number: number): SkillMission {
-  const names = [
-    'Trabalhador Eficiente',
-    'Trabalhador Graduado',
-    'Masterpiece em Produção',
-    'Especialista de Precisão',
-    'Mestre de Turno',
-    'Engenheiro de Bancada',
-  ]
-  const bonusPercent = Math.min(100_000_000, 15 + (number - 1) * 5)
-  return {
-    name: `${names[(number - 1) % names.length]} · Missão ${formatNumber(number)}`,
-    productionRequirement: getMissionProductionRequirement(number),
-    costCents: getMissionCostCents(number),
-    reward: `+${bonusPercent}% de produção por trabalhador`,
-  }
-}
-
-function getDemandMission(number: number): SkillMission {
-  const names = [
-    'Acordo com Distribuidores',
-    'Feira de Fornecedores',
-    'Rede de Oficinas',
-    'Catálogo Industrial',
-    'Parceria Regional',
-    'Mercado em Expansão',
-  ]
-  const bonusDemandPercent = number * 50
-  return {
-    name: `${names[(number - 1) % names.length]} · Missão ${formatNumber(number)}`,
-    productionRequirement: getMissionProductionRequirement(number),
-    costCents: getMissionCostCents(number, 2),
-    reward: `+${formatPercent(bonusDemandPercent)} de demanda, mesmo preço`,
-  }
-}
-
-function getSkillBonuses(workerSkills: number, demandSkills: number): SkillBonuses {
-  return {
-    productionPercent: Math.min(
-      100_000_000,
-      workerSkills * 15 + (5 * workerSkills * (workerSkills - 1)) / 2,
+function getWorkerCostCents(workers: number, discountPercent = 0) {
+  return Math.max(
+    1,
+    Math.round(
+      FIRST_WORKER_COST_CENTS *
+        WORKER_COST_GROWTH ** workers *
+        (1 - discountPercent / 100),
     ),
-    demandPercent: demandSkills * 50,
-  }
-}
-
-function formatNumber(value: number) {
-  return new Intl.NumberFormat('pt-BR').format(value)
-}
-
-function formatPercent(value: number) {
-  return `${new Intl.NumberFormat('pt-BR', {
-    maximumFractionDigits: 1,
-  }).format(value)}%`
-}
-
-function formatRate(value: number) {
-  return new Intl.NumberFormat('pt-BR', {
-    maximumFractionDigits: 1,
-  }).format(value)
-}
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(amount)
+  )
 }
 
 function App() {
@@ -597,11 +314,11 @@ function App() {
   const nextAnimationId = useRef(0)
   const animationTimeouts = useRef(new Set<number>())
   const lastAnimatedProduction = useRef(factory.produced)
-  const saveFileInput = useRef<HTMLInputElement>(null)
   const skillBonuses = getSkillBonuses(
     factory.workerSkills,
     factory.demandSkills,
   )
+  const operationsBonuses = getOperationsBonuses(factory.operationsSkills)
   const productionPerSecond = getProductionRate(
     factory.workers,
     skillBonuses.productionPercent,
@@ -610,6 +327,9 @@ function App() {
   )
   const nextWorkerMission = getWorkerMission(factory.workerSkills + 1)
   const nextDemandMission = getDemandMission(factory.demandSkills + 1)
+  const nextOperationsMission = getOperationsMission(
+    factory.operationsSkills + 1,
+  )
   const priceDemandPercent = getPriceDemandPercent(factory.priceCents)
   const eventDemandBonusPercent = getEventDemandBonusPercent(
     factory.eventEffects,
@@ -633,27 +353,23 @@ function App() {
         ),
       )
     : 0
-  const workerMissionProgress = Math.min(
-    100,
-    (factory.produced / nextWorkerMission.productionRequirement) * 100,
-  )
-  const demandMissionProgress = Math.min(
-    100,
-    (factory.produced / nextDemandMission.productionRequirement) * 100,
-  )
   const canUnlockWorkerMission =
-    factory.produced >= nextWorkerMission.productionRequirement &&
+    factory.produced >= nextWorkerMission.metricRequirement &&
     factory.cashCents >= nextWorkerMission.costCents
   const canUnlockDemandMission =
-    factory.produced >= nextDemandMission.productionRequirement &&
+    factory.sold >= nextDemandMission.metricRequirement &&
     factory.cashCents >= nextDemandMission.costCents
+  const operationsProgress =
+    nextOperationsMission.metric === 'produced'
+      ? factory.produced
+      : factory.sold
+  const canUnlockOperationsMission =
+    operationsProgress >= nextOperationsMission.metricRequirement &&
+    factory.cashCents >= nextOperationsMission.costCents
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(
-        SAVE_STORAGE_KEY,
-        createGameSaveJson(factory),
-      )
+      persistLocalSave(factory)
       setSaveMessage('Progresso salvo automaticamente neste navegador.')
     } catch (error) {
       console.error('Não foi possível salvar o progresso local.', error)
@@ -790,11 +506,15 @@ function App() {
         }
 
         const soldNow = Math.min(inventoryAfterProduction, orders)
+        const unitRevenueCents = Math.round(
+          currentFactory.priceCents *
+            (1 + operationsBonuses.saleMarginPercent / 100),
+        )
         return {
           ...currentFactory,
           inventory: inventoryAfterProduction - soldNow,
           cashCents:
-            currentFactory.cashCents + soldNow * currentFactory.priceCents,
+            currentFactory.cashCents + soldNow * unitRevenueCents,
           sold: currentFactory.sold + soldNow,
           produced: producedAfterTick,
           eventEffects: activeEffects,
@@ -813,21 +533,26 @@ function App() {
     factory.workers,
     skillBonuses.demandPercent,
     skillBonuses.productionPercent,
+    operationsBonuses.saleMarginPercent,
   ])
 
   function produceNut() {
+    const quantity = 1 + operationsBonuses.manualProduction
     setFactory((currentFactory) => ({
       ...currentFactory,
-      inventory: currentFactory.inventory + 1,
-      produced: currentFactory.produced + 1,
+      inventory: currentFactory.inventory + quantity,
+      produced: currentFactory.produced + quantity,
     }))
 
-    addProductionAnimations(1)
+    addProductionAnimations(quantity)
   }
 
   function hireWorker() {
     setFactory((currentFactory) => {
-      const costCents = getWorkerCostCents(currentFactory.workers)
+      const costCents = getWorkerCostCents(
+        currentFactory.workers,
+        operationsBonuses.workerDiscountPercent,
+      )
       if (currentFactory.cashCents < costCents) return currentFactory
 
       return {
@@ -838,14 +563,22 @@ function App() {
     })
   }
 
-  function unlockSkillMission(track: 'worker' | 'demand') {
+  function unlockSkillMission(
+    track: 'worker' | 'demand' | 'operations',
+  ) {
     setFactory((currentFactory) => {
       const mission =
         track === 'worker'
           ? getWorkerMission(currentFactory.workerSkills + 1)
-          : getDemandMission(currentFactory.demandSkills + 1)
+          : track === 'demand'
+            ? getDemandMission(currentFactory.demandSkills + 1)
+            : getOperationsMission(currentFactory.operationsSkills + 1)
+      const progress =
+        mission.metric === 'produced'
+          ? currentFactory.produced
+          : currentFactory.sold
       if (
-        currentFactory.produced < mission.productionRequirement ||
+        progress < mission.metricRequirement ||
         currentFactory.cashCents < mission.costCents
       ) {
         return currentFactory
@@ -853,11 +586,17 @@ function App() {
 
       return {
         ...currentFactory,
-        cashCents: currentFactory.cashCents - mission.costCents,
+        cashCents: getCappedMoneyAmount(
+          currentFactory.cashCents -
+            mission.costCents +
+            (mission.rewardKind === 'cash' ? mission.rewardAmount : 0),
+        ),
         workerSkills:
           currentFactory.workerSkills + (track === 'worker' ? 1 : 0),
         demandSkills:
           currentFactory.demandSkills + (track === 'demand' ? 1 : 0),
+        operationsSkills:
+          currentFactory.operationsSkills + (track === 'operations' ? 1 : 0),
       }
     })
   }
@@ -1067,7 +806,13 @@ function App() {
             >
               <div className="line-section-heading">
                 <h3 id="production-title">Produção</h3>
-                <span className="production-rate">1 porca por clique</span>
+                <span className="production-rate">
+                  {formatNumber(1 + operationsBonuses.manualProduction)}{' '}
+                  {1 + operationsBonuses.manualProduction === 1
+                    ? 'porca'
+                    : 'porcas'}{' '}
+                  por clique
+                </span>
               </div>
 
               <div
@@ -1159,9 +904,13 @@ function App() {
                     onClick={hireWorker}
                     type="button"
                     disabled={
-                      factory.cashCents < getWorkerCostCents(factory.workers)
+                      factory.cashCents <
+                      getWorkerCostCents(
+                        factory.workers,
+                        operationsBonuses.workerDiscountPercent,
+                      )
                     }
-                    aria-label={`Contratar trabalhador por ${formatCurrency(getWorkerCostCents(factory.workers) / 100)}`}
+                    aria-label={`Contratar trabalhador por ${formatCurrency(getWorkerCostCents(factory.workers, operationsBonuses.workerDiscountPercent) / 100)}`}
                   >
                     <span className="worker-summary-icon" aria-hidden="true">
                       👷
@@ -1171,7 +920,10 @@ function App() {
                     </span>
                     <span className="hire-worker-price">
                       {formatCurrency(
-                        getWorkerCostCents(factory.workers) / 100,
+                        getWorkerCostCents(
+                          factory.workers,
+                          operationsBonuses.workerDiscountPercent,
+                        ) / 100,
                       )}
                     </span>
                   </button>
@@ -1245,6 +997,8 @@ function App() {
                   {formatPercent(skillBonuses.demandPercent)} de habilidades
                   {eventDemandBonusPercent > 0 &&
                     ` + ${formatPercent(eventDemandBonusPercent)} de eventos`}
+                  {operationsBonuses.saleMarginPercent > 0 &&
+                    ` · margem +${formatPercent(operationsBonuses.saleMarginPercent)}`}
                 </span>
                 <span className="demand-sales-rate">
                   {formatRate(salesPerMinute)} porcas / min
@@ -1261,146 +1015,20 @@ function App() {
 
         </section>
 
-        <section
-          className={`mission-tracks${areMissionsCollapsed ? ' is-collapsed' : ''}`}
-          aria-label="Missões da linha"
-        >
-          <header className="mission-drawer-header">
-            <div className="mission-drawer-title">
-                <p className="panel-kicker">PRÓXIMOS OBJETIVOS</p>
-                <h2>Missões</h2>
-            </div>
-            <button
-              className="mission-drawer-toggle"
-              type="button"
-              onClick={() => setAreMissionsCollapsed((collapsed) => !collapsed)}
-              aria-expanded={!areMissionsCollapsed}
-              aria-controls="mission-track-list"
-              aria-label={
-                areMissionsCollapsed
-                  ? 'Expandir missões'
-                  : 'Recolher missões'
-              }
-            >
-              {areMissionsCollapsed ? (
-                <span aria-hidden="true">‹</span>
-              ) : (
-                <span aria-hidden="true">›</span>
-              )}
-            </button>
-          </header>
-          <div className="mission-track-list" id="mission-track-list">
-          <article
-            className="skill-mission worker-mission"
-            key={`worker-${factory.workerSkills}`}
-            aria-labelledby="worker-mission-title"
-          >
-            <div className="skill-mission-info">
-              <p className="panel-kicker">
-                TRABALHADORES · MISSÃO {formatNumber(factory.workerSkills + 1)}
-              </p>
-              <h2 id="worker-mission-title">{nextWorkerMission.name}</h2>
-              <span className="skill-reward">{nextWorkerMission.reward}</span>
-            </div>
-            <div className="skill-progress">
-              <div
-                className="skill-progress-track"
-                role="progressbar"
-                aria-label={`Progresso para ${nextWorkerMission.name}`}
-                aria-valuemin={0}
-                aria-valuemax={nextWorkerMission.productionRequirement}
-                aria-valuenow={Math.min(
-                  factory.produced,
-                  nextWorkerMission.productionRequirement,
-                )}
-              >
-                <span style={{ width: `${workerMissionProgress}%` }} />
-              </div>
-              <span>
-                {formatNumber(
-                  Math.min(
-                    factory.produced,
-                    nextWorkerMission.productionRequirement,
-                  ),
-                )}{' '}
-                / {formatNumber(nextWorkerMission.productionRequirement)} porcas
-              </span>
-            </div>
-            <div className="skill-unlock">
-              <span className="skill-cost">
-                {formatCurrency(nextWorkerMission.costCents / 100)}
-              </span>
-              <button
-                className="skill-unlock-button"
-                type="button"
-                onClick={() => unlockSkillMission('worker')}
-                disabled={!canUnlockWorkerMission}
-              >
-                Desbloquear
-              </button>
-              {factory.produced >= nextWorkerMission.productionRequirement &&
-                factory.cashCents < nextWorkerMission.costCents && (
-                  <span className="skill-status">Caixa insuficiente</span>
-                )}
-            </div>
-          </article>
-
-          <article
-            className="skill-mission demand-mission"
-            key={`demand-${factory.demandSkills}`}
-            aria-labelledby="demand-mission-title"
-          >
-            <div className="skill-mission-info">
-              <p className="panel-kicker">
-                DEMANDA · MISSÃO {formatNumber(factory.demandSkills + 1)}
-              </p>
-              <h2 id="demand-mission-title">{nextDemandMission.name}</h2>
-              <span className="skill-reward">{nextDemandMission.reward}</span>
-            </div>
-            <div className="skill-progress">
-              <div
-                className="skill-progress-track"
-                role="progressbar"
-                aria-label={`Progresso para ${nextDemandMission.name}`}
-                aria-valuemin={0}
-                aria-valuemax={nextDemandMission.productionRequirement}
-                aria-valuenow={Math.min(
-                  factory.produced,
-                  nextDemandMission.productionRequirement,
-                )}
-              >
-                <span style={{ width: `${demandMissionProgress}%` }} />
-              </div>
-              <span>
-                {formatNumber(
-                  Math.min(
-                    factory.produced,
-                    nextDemandMission.productionRequirement,
-                  ),
-                )}{' '}
-                / {formatNumber(nextDemandMission.productionRequirement)} porcas
-              </span>
-            </div>
-            <div className="skill-unlock">
-              <span className="skill-cost">
-                {formatCurrency(nextDemandMission.costCents / 100)}
-              </span>
-              <button
-                className="skill-unlock-button"
-                type="button"
-                onClick={() => unlockSkillMission('demand')}
-                disabled={!canUnlockDemandMission}
-              >
-                Desbloquear
-              </button>
-              {factory.produced >= nextDemandMission.productionRequirement &&
-                factory.cashCents < nextDemandMission.costCents && (
-                  <span className="skill-status">Caixa insuficiente</span>
-                )}
-            </div>
-          </article>
-          </div>
-        </section>
+        <MissionDrawer
+          factory={factory}
+          workerMission={nextWorkerMission}
+          demandMission={nextDemandMission}
+          operationsMission={nextOperationsMission}
+          canUnlockWorkerMission={canUnlockWorkerMission}
+          canUnlockDemandMission={canUnlockDemandMission}
+          canUnlockOperationsMission={canUnlockOperationsMission}
+          collapsed={areMissionsCollapsed}
+          onToggleCollapsed={() =>
+            setAreMissionsCollapsed((collapsed) => !collapsed)
+          }
+          onUnlock={unlockSkillMission}
+        />
       </section>
 
       <footer className="page-footer">
@@ -1504,102 +1132,19 @@ function App() {
       )}
 
       {isSaveDialogOpen && (
-        <div
-          className="save-dialog-backdrop"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setIsSaveDialogOpen(false)
-            }
+        <SaveDialog
+          saveText={saveText}
+          saveMessage={saveMessage}
+          onClose={() => setIsSaveDialogOpen(false)}
+          onTextChange={(text) => {
+            setSaveText(text)
+            setIsSaveTextEdited(true)
           }}
-        >
-          <section
-            className="save-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="save-dialog-title"
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') setIsSaveDialogOpen(false)
-            }}
-          >
-            <div className="save-dialog-heading">
-              <div>
-                <p className="panel-kicker">SEU PROGRESSO</p>
-                <h2 id="save-dialog-title">Salvar ou carregar jogo</h2>
-              </div>
-              <button
-                className="save-dialog-close"
-                type="button"
-                onClick={() => setIsSaveDialogOpen(false)}
-                aria-label="Fechar janela de save"
-              >
-                ×
-              </button>
-            </div>
-            <p className="save-dialog-description">
-              O jogo salva automaticamente neste navegador. Copie o texto ou
-              exporte o JSON para levar seu progresso a outro dispositivo.
-            </p>
-            <label className="save-text-label" htmlFor="save-text">
-              Save em texto (JSON)
-            </label>
-            <textarea
-              id="save-text"
-              className="save-textarea"
-              value={saveText}
-              onChange={(event) => {
-                setSaveText(event.target.value)
-                setIsSaveTextEdited(true)
-              }}
-              autoFocus
-              spellCheck={false}
-              rows={12}
-            />
-            <div className="save-dialog-actions">
-              <button
-                className="save-action-button save-action-primary"
-                type="button"
-                onClick={() => void copySaveText()}
-              >
-                Copiar texto
-              </button>
-              <button
-                className="save-action-button"
-                type="button"
-                onClick={downloadSave}
-              >
-                Exportar JSON
-              </button>
-              <button
-                className="save-action-button"
-                type="button"
-                onClick={() => loadSaveText()}
-              >
-                Carregar texto
-              </button>
-              <button
-                className="save-action-button"
-                type="button"
-                onClick={() => saveFileInput.current?.click()}
-              >
-                Abrir arquivo
-              </button>
-              <input
-                ref={saveFileInput}
-                className="save-file-input"
-                type="file"
-                accept="application/json,.json"
-                aria-label="Selecionar arquivo de save JSON"
-                onChange={(event) => {
-                  void readSaveFile(event.currentTarget.files?.[0])
-                  event.currentTarget.value = ''
-                }}
-              />
-            </div>
-            <p className="save-dialog-status" role="status">
-              {saveMessage}
-            </p>
-          </section>
-        </div>
+          onCopy={() => void copySaveText()}
+          onDownload={downloadSave}
+          onLoadText={() => loadSaveText()}
+          onReadFile={(file) => void readSaveFile(file)}
+        />
       )}
     </main>
   )
