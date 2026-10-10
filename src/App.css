@@ -1374,6 +1374,11 @@ h2 {
   margin-top: 8px;
 }
 
+.worker-hiring {
+  display: grid;
+  gap: 6px;
+}
+
 .hire-worker-button {
   display: flex;
   width: 100%;
@@ -1408,6 +1413,28 @@ h2 {
 .hire-worker-button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
+}
+
+.marketing-agent-button {
+  border-color: #d6e1e0;
+  background: #f2f8f7;
+}
+
+.marketing-agent-button:hover:not(:disabled) {
+  border-color: #668d91;
+  background: #f7fbfa;
+}
+
+.marketing-agent-button:focus-visible {
+  outline-color: rgb(102 141 145 / 40%);
+}
+
+.marketing-agent-button .worker-summary-icon {
+  background: #e2eeec;
+}
+
+.marketing-agent-button .hire-worker-price {
+  color: #527a7e;
 }
 
 .worker-summary-icon {

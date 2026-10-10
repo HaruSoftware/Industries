@@ -11,6 +11,9 @@ preço e a demanda da linha. O caixa é acompanhado no resumo da fábrica.
 - Contrate trabalhadores pelo botão na seção de produção. Cada trabalhador
   custa R$ 100,00 inicialmente e produz uma porca por segundo. O preço de cada
   nova contratação aumenta 15%.
+- Contrate **Agentes de marketing** logo abaixo dos trabalhadores. Cada agente
+  adiciona 25 pontos percentuais à demanda da linha, custa R$ 150,00 no início
+  e o preço aumenta 20% a cada contratação.
 - A campanha tem três trilhas independentes, cada uma com objetivos próprios:
   - **Trabalhadores**: contratos de capacidade exigem produzir porcas e pagar
     o investimento indicado. O primeiro exige 1.800 porcas e R$ 180,00; as

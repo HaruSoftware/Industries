@@ -109,6 +109,8 @@ export function parseGameSave(text: string): FactoryState {
     !isNonnegativeSafeInteger(factory.sold) ||
     !isNonnegativeSafeInteger(factory.produced) ||
     !isNonnegativeSafeInteger(factory.workers) ||
+    (factory.marketingAgents !== undefined &&
+      !isNonnegativeSafeInteger(factory.marketingAgents)) ||
     !isNonnegativeSafeInteger(factory.workerSkills) ||
     !isNonnegativeSafeInteger(factory.demandSkills) ||
     (factory.operationsSkills !== undefined &&
@@ -128,6 +130,9 @@ export function parseGameSave(text: string): FactoryState {
     sold: factory.sold,
     produced: factory.produced,
     workers: factory.workers,
+    marketingAgents: isNonnegativeSafeInteger(factory.marketingAgents)
+      ? factory.marketingAgents
+      : 0,
     workerSkills: factory.workerSkills,
     demandSkills: factory.demandSkills,
     operationsSkills: isNonnegativeSafeInteger(factory.operationsSkills)

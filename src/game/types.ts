@@ -65,6 +65,7 @@ export type FactoryState = {
   sold: number
   produced: number
   workers: number
+  marketingAgents: number
   workerSkills: number
   demandSkills: number
   operationsSkills: number
@@ -83,6 +84,7 @@ export const initialFactoryState: FactoryState = {
   sold: 0,
   produced: 0,
   workers: 0,
+  marketingAgents: 0,
   workerSkills: 0,
   demandSkills: 0,
   operationsSkills: 0,

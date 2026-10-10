@@ -50,6 +50,9 @@ const SALES_PER_MINUTE_PER_DEMAND_PERCENT =
   REFERENCE_DEMAND_PER_MINUTE / REFERENCE_DEMAND_PERCENT
 const FIRST_WORKER_COST_CENTS = 10_000
 const WORKER_COST_GROWTH = 1.15
+const FIRST_MARKETING_AGENT_COST_CENTS = 15_000
+const MARKETING_AGENT_COST_GROWTH = 1.2
+const MARKETING_AGENT_DEMAND_BONUS_PERCENT = 25
 const MAX_VISIBLE_PRODUCTION_ANIMATIONS = 8
 const PRODUCTION_ANIMATION_DURATION_MS = 850
 const PRODUCTION_ANIMATION_STAGGER_MS = 65
@@ -105,6 +108,22 @@ function getWorkerInvestmentCents(workers: number) {
   return getCappedMoneyAmount(total)
 }
 
+function getMarketingAgentInvestmentCents(agents: number) {
+  if (agents <= 0) return 0
+  const total =
+    (FIRST_MARKETING_AGENT_COST_CENTS *
+      (MARKETING_AGENT_COST_GROWTH ** agents - 1)) /
+    (MARKETING_AGENT_COST_GROWTH - 1)
+  return getCappedMoneyAmount(total)
+}
+
+function getMarketingAgentCostCents(agents: number) {
+  return getCappedMoneyAmount(
+    FIRST_MARKETING_AGENT_COST_CENTS *
+      MARKETING_AGENT_COST_GROWTH ** agents,
+  )
+}
+
 function getFactoryNetWorthCents(factory: FactoryState) {
   const inventoryValue = getCappedMoneyAmount(
     factory.inventory * factory.priceCents,
@@ -113,6 +132,7 @@ function getFactoryNetWorthCents(factory: FactoryState) {
     factory.cashCents +
       inventoryValue +
       getWorkerInvestmentCents(factory.workers) +
+      getMarketingAgentInvestmentCents(factory.marketingAgents) +
       getMissionInvestmentCents(factory.workerSkills, 'worker') +
       getMissionInvestmentCents(factory.demandSkills, 'demand') +
       getMissionInvestmentCents(factory.operationsSkills, 'operations'),
@@ -337,7 +357,9 @@ function App() {
   )
   const demandPercent = getDemandPercent(
     factory.priceCents,
-    skillBonuses.demandPercent + eventDemandBonusPercent,
+    skillBonuses.demandPercent +
+      factory.marketingAgents * MARKETING_AGENT_DEMAND_BONUS_PERCENT +
+      eventDemandBonusPercent,
   )
   const salesPerMinute = getSalesPerMinute(demandPercent)
   const demandMeterPercentage =
@@ -477,6 +499,8 @@ function App() {
         const demandPercent = getDemandPercent(
           currentFactory.priceCents,
           bonuses.demandPercent +
+            currentFactory.marketingAgents *
+              MARKETING_AGENT_DEMAND_BONUS_PERCENT +
             getEventDemandBonusPercent(activeEffects, now),
         )
         const salesPerMinute = getSalesPerMinute(demandPercent)
@@ -531,6 +555,7 @@ function App() {
     return () => window.clearInterval(timerId)
   }, [
     factory.workers,
+    factory.marketingAgents,
     skillBonuses.demandPercent,
     skillBonuses.productionPercent,
     operationsBonuses.saleMarginPercent,
@@ -559,6 +584,21 @@ function App() {
         ...currentFactory,
         cashCents: currentFactory.cashCents - costCents,
         workers: currentFactory.workers + 1,
+      }
+    })
+  }
+
+  function hireMarketingAgent() {
+    setFactory((currentFactory) => {
+      const costCents = getMarketingAgentCostCents(
+        currentFactory.marketingAgents,
+      )
+      if (currentFactory.cashCents < costCents) return currentFactory
+
+      return {
+        ...currentFactory,
+        cashCents: currentFactory.cashCents - costCents,
+        marketingAgents: currentFactory.marketingAgents + 1,
       }
     })
   }
@@ -916,13 +956,41 @@ function App() {
                       👷
                     </span>
                     <span className="hire-worker-copy">
-                      <strong>{factory.workers}</strong>
+                      <strong>Trabalhadores</strong>
+                      <small>{formatNumber(factory.workers)} contratados</small>
                     </span>
                     <span className="hire-worker-price">
                       {formatCurrency(
                         getWorkerCostCents(
                           factory.workers,
                           operationsBonuses.workerDiscountPercent,
+                        ) / 100,
+                      )}
+                    </span>
+                  </button>
+                  <button
+                    className="hire-worker-button marketing-agent-button"
+                    onClick={hireMarketingAgent}
+                    type="button"
+                    disabled={
+                      factory.cashCents <
+                      getMarketingAgentCostCents(factory.marketingAgents)
+                    }
+                    aria-label={`Contratar agente de marketing por ${formatCurrency(getMarketingAgentCostCents(factory.marketingAgents) / 100)}`}
+                  >
+                    <span className="worker-summary-icon" aria-hidden="true">
+                      📣
+                    </span>
+                    <span className="hire-worker-copy">
+                      <strong>Agentes de marketing</strong>
+                      <small>
+                        {formatNumber(factory.marketingAgents)} contratados
+                      </small>
+                    </span>
+                    <span className="hire-worker-price">
+                      {formatCurrency(
+                        getMarketingAgentCostCents(
+                          factory.marketingAgents,
                         ) / 100,
                       )}
                     </span>
@@ -995,6 +1063,8 @@ function App() {
                 <span className="demand-breakdown">
                   {formatPercent(priceDemandPercent)} pelo preço +{' '}
                   {formatPercent(skillBonuses.demandPercent)} de habilidades
+                  {factory.marketingAgents > 0 &&
+                    ` + ${formatPercent(factory.marketingAgents * MARKETING_AGENT_DEMAND_BONUS_PERCENT)} de marketing`}
                   {eventDemandBonusPercent > 0 &&
                     ` + ${formatPercent(eventDemandBonusPercent)} de eventos`}
                   {operationsBonuses.saleMarginPercent > 0 &&
