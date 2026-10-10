@@ -321,7 +321,9 @@ h1 {
   flex-direction: column;
   gap: 7px;
   overflow-y: auto;
+  margin: 0;
   padding: 4px;
+  list-style: none;
   pointer-events: none;
 }
 
@@ -332,6 +334,7 @@ h1 {
   position: relative;
   isolation: isolate;
   align-items: center;
+  flex: 0 0 auto;
   gap: 9px;
   padding: 8px 10px;
   overflow: hidden;
@@ -948,10 +951,11 @@ h1 {
   display: flex;
   position: fixed;
   z-index: 20;
-  top: max(84px, env(safe-area-inset-top));
+  top: auto;
   right: max(16px, env(safe-area-inset-right));
   bottom: max(16px, env(safe-area-inset-bottom));
   width: min(430px, calc(100vw - 32px));
+  max-height: min(82vh, 720px);
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
@@ -2545,10 +2549,11 @@ h2 {
   }
 
   .line-side-panels {
-    top: max(84px, env(safe-area-inset-top));
+    top: auto;
     right: max(10px, env(safe-area-inset-right));
     bottom: max(10px, env(safe-area-inset-bottom));
     width: min(400px, calc(100vw - 28px));
+    max-height: min(78vh, 680px);
     gap: 8px;
   }
 

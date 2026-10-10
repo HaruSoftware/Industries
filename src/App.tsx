@@ -338,18 +338,22 @@ function formatPriceInput(priceCents: number) {
   }).format(priceCents / 100)
 }
 
-function getPriceDemandPercent(priceCents: number) {
+function getPriceDemandMultiplier(priceCents: number) {
   return priceCents <= REFERENCE_PRICE_CENTS
-    ? REFERENCE_DEMAND_PERCENT *
-        (REFERENCE_PRICE_CENTS / priceCents) **
-          LOW_PRICE_DEMAND_ELASTICITY
-    : REFERENCE_DEMAND_PERCENT *
-        (REFERENCE_PRICE_CENTS / priceCents) **
-          HIGH_PRICE_DEMAND_ELASTICITY
+    ? (REFERENCE_PRICE_CENTS / priceCents) ** LOW_PRICE_DEMAND_ELASTICITY
+    : (REFERENCE_PRICE_CENTS / priceCents) ** HIGH_PRICE_DEMAND_ELASTICITY
+}
+
+function getPriceDemandPercent(priceCents: number) {
+  return REFERENCE_DEMAND_PERCENT * getPriceDemandMultiplier(priceCents)
 }
 
 function getDemandPercent(priceCents: number, bonusDemandPercent = 0) {
-  return Math.max(0, getPriceDemandPercent(priceCents) + bonusDemandPercent)
+  return Math.max(
+    0,
+    (REFERENCE_DEMAND_PERCENT + bonusDemandPercent) *
+      getPriceDemandMultiplier(priceCents),
+  )
 }
 
 function getEventDemandBonusPercent(effects: ActiveGameEffect[], now: number) {
@@ -358,6 +362,36 @@ function getEventDemandBonusPercent(effects: ActiveGameEffect[], now: number) {
       (effect) => effect.target === 'demand' && effect.expiresAt > now,
     )
     .reduce((total, effect) => total + effect.amount, 0)
+}
+
+function getActiveEffectGroups(effects: ActiveGameEffect[], now: number) {
+  const groups = new Map<string, ActiveGameEffect[]>()
+
+  effects
+    .filter((effect) => effect.expiresAt > now)
+    .forEach((effect) => {
+      const key = JSON.stringify([
+        effect.target,
+        effect.operation,
+        effect.amount,
+        effect.durationMs,
+        effect.source,
+      ])
+      const group = groups.get(key) ?? []
+      group.push(effect)
+      groups.set(key, group)
+    })
+
+  return Array.from(groups, ([key, group]) => ({
+    key,
+    effect: group.reduce(
+      (latest, current) => ({
+        ...latest,
+        amount: latest.amount + current.amount,
+        expiresAt: Math.max(latest.expiresAt, current.expiresAt),
+      }),
+    ),
+  }))
 }
 
 function getSalesPerMinute(demandPercent: number) {
@@ -380,7 +414,7 @@ function App() {
   const [factoryState, setFactoryState] = useState(initialSave.factory)
   const [activeLineTab, setActiveLineTab] = useState('line-1')
   const [priceInput, setPriceInput] = useState(() =>
-    formatPriceInput(initialSave.factory.lines[0].priceCents),
+    formatNumber(initialSave.factory.lines[0].priceCents / 100),
   )
   const [productionAnimations, setProductionAnimations] = useState<
     ProductionAnimation[]
@@ -431,6 +465,11 @@ function App() {
     factory.operationsSkills + 1,
   )
   const priceDemandPercent = getPriceDemandPercent(factory.priceCents)
+  const priceDemandMultiplier = getPriceDemandMultiplier(factory.priceCents)
+  const activeEffectGroups = getActiveEffectGroups(
+    factory.eventEffects,
+    eventClock,
+  )
   const eventDemandBonusPercent = getEventDemandBonusPercent(
     factory.eventEffects,
     eventClock,
@@ -886,7 +925,7 @@ function App() {
 
   function changePrice(priceCents: number) {
     updateActiveLine((line) => ({ ...line, priceCents }))
-    setPriceInput(formatPriceInput(priceCents))
+    setPriceInput(formatNumber(priceCents / 100))
   }
 
   function handlePriceInputChange(value: string) {
@@ -907,7 +946,7 @@ function App() {
   function commitPriceInput() {
     const parsedPrice = Number(priceInput.replace(',', '.'))
     if (!Number.isFinite(parsedPrice)) {
-      setPriceInput(formatPriceInput(factory.priceCents))
+      setPriceInput(formatNumber(factory.priceCents / 100))
       return
     }
 
@@ -931,7 +970,7 @@ function App() {
       setFactoryState(importedFactory)
       setActiveLineTab(firstLine.id)
       setIsSaveTextEdited(false)
-      setPriceInput(formatPriceInput(firstLine.priceCents))
+      setPriceInput(formatNumber(firstLine.priceCents / 100))
       setProductionAnimations([])
       lastAnimatedProduction.current = firstLine.produced
       setEventClock(Date.now())
@@ -1119,6 +1158,9 @@ function App() {
                         onChange={(event) =>
                           handlePriceInputChange(event.target.value)
                         }
+                        onFocus={() =>
+                          setPriceInput(formatPriceInput(factory.priceCents))
+                        }
                         onBlur={commitPriceInput}
                         aria-label="Preço por porca em reais"
                       />
@@ -1157,11 +1199,11 @@ function App() {
                     </div>
                     <span className="demand-breakdown">
                       {formatPercent(priceDemandPercent)} pelo preço +{' '}
-                      {formatPercent(skillBonuses.demandPercent)} de habilidades
+                      {formatPercent(skillBonuses.demandPercent * priceDemandMultiplier)} de habilidades
                       {factory.marketingAgents > 0 &&
-                        ` + ${formatPercent(factory.marketingAgents * MARKETING_AGENT_DEMAND_BONUS_PERCENT)} de marketing`}
+                        ` + ${formatPercent(factory.marketingAgents * MARKETING_AGENT_DEMAND_BONUS_PERCENT * priceDemandMultiplier)} de marketing`}
                       {eventDemandBonusPercent > 0 &&
-                        ` + ${formatPercent(eventDemandBonusPercent)} de eventos`}
+                        ` + ${formatPercent(eventDemandBonusPercent * priceDemandMultiplier)} de eventos`}
                       {operationsBonuses.saleMarginPercent > 0 &&
                         ` · margem +${formatPercent(operationsBonuses.saleMarginPercent)}`}
                     </span>
@@ -1462,12 +1504,9 @@ function App() {
         <span>PRODUZA · PRECIFIQUE · VENDA</span>
       </footer>
 
-      {activeLineTab === 'line-1' &&
-        factory.eventEffects.some((effect) => effect.expiresAt > eventClock) && (
-        <section className="active-effects-list" aria-label="Habilidades ativas">
-          {factory.eventEffects
-            .filter((effect) => effect.expiresAt > eventClock)
-            .map((effect) => {
+      {activeLineTab === 'line-1' && activeEffectGroups.length > 0 && (
+        <ul className="active-effects-list" aria-label="Habilidades ativas">
+          {activeEffectGroups.map(({ key, effect }) => {
               const effectTimeRemaining = Math.max(
                 0,
                 Math.min(
@@ -1477,9 +1516,9 @@ function App() {
               )
 
               return (
-                <article
+                <li
                   className="active-effect-card"
-                  key={effect.id}
+                  key={key}
                   aria-label={`Bônus ativo: ${formatEventReward(effect)} de ${effect.source}`}
                 >
                   <span className="active-effect-icon" aria-hidden="true">
@@ -1502,10 +1541,10 @@ function App() {
                       <span style={{ width: `${effectTimeRemaining}%` }} />
                     </span>
                   </span>
-                </article>
+                </li>
               )
             })}
-        </section>
+        </ul>
       )}
 
       {gameEvent && (
