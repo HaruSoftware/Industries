@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { RotateCcw } from 'lucide-react'
 
 type SaveDialogProps = {
   saveText: string
@@ -9,6 +10,7 @@ type SaveDialogProps = {
   onDownload: () => void
   onLoadText: () => void
   onReadFile: (file: File | undefined) => void
+  onReset: () => void
 }
 
 export function SaveDialog({
@@ -20,6 +22,7 @@ export function SaveDialog({
   onDownload,
   onLoadText,
   onReadFile,
+  onReset,
 }: SaveDialogProps) {
   const saveFileInput = useRef<HTMLInputElement>(null)
 
@@ -97,6 +100,14 @@ export function SaveDialog({
             onClick={() => saveFileInput.current?.click()}
           >
             Abrir arquivo
+          </button>
+          <button
+            className="save-action-button save-action-danger"
+            type="button"
+            onClick={onReset}
+          >
+            <RotateCcw aria-hidden="true" size={14} />
+            Começar de novo
           </button>
           <input
             ref={saveFileInput}

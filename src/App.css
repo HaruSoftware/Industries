@@ -168,6 +168,20 @@
   background: #913d2c;
 }
 
+.save-action-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-color: #d7a499;
+  background: #fbefeb;
+  color: #8b382c;
+}
+
+.save-action-danger:hover {
+  border-color: #bd7464;
+  background: #f4ded8;
+}
+
 .save-file-input {
   display: none;
 }
@@ -1187,6 +1201,11 @@ h1 {
   line-height: 1;
 }
 
+.mission-tracks.is-collapsed .mission-unlock-count {
+  top: 1px;
+  right: 1px;
+}
+
 .inventory-drawer-toggle {
   border-color: #c6d5ca;
   background: #e1ebe3;
@@ -1211,6 +1230,13 @@ h1 {
   border: 0;
   border-radius: 0;
   background: transparent;
+}
+
+.mission-tracks.is-collapsed .mission-drawer-toggle {
+  position: absolute;
+  inset: 2px;
+  width: auto;
+  height: auto;
 }
 
 .mission-drawer-toggle:hover {
@@ -2640,6 +2666,12 @@ h2 {
     margin: 8px 0 4px;
   }
 
+  .press {
+    top: 4px;
+    transform: translateX(-50%) scale(0.72);
+    transform-origin: top center;
+  }
+
   .line-section {
     padding-top: 0;
     padding-left: 9px;
@@ -2762,6 +2794,10 @@ h2 {
   .assembly-floor {
     height: 150px;
     margin: 7px 0 4px;
+  }
+
+  .press {
+    transform: translateX(-50%) scale(0.65);
   }
 
   .line-layout {

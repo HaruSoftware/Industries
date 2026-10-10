@@ -24,6 +24,7 @@ import {
   readLocalSave,
 } from './game/save'
 import {
+  initialFactoryState,
   MAX_PRICE_CENTS,
   MIN_PRICE_CENTS,
 } from './game/types'
@@ -962,6 +963,43 @@ function App() {
     setIsSaveDialogOpen(true)
   }
 
+  function startNewGame() {
+    const confirmed = window.confirm(
+      'Começar um novo jogo? O progresso salvo neste navegador será substituído e não poderá ser recuperado.',
+    )
+    if (!confirmed) return
+
+    const now = Date.now()
+    const freshFactory: FactoryState = {
+      ...initialFactoryState,
+      lines: initialFactoryState.lines.map((line) => ({
+        ...line,
+        eventEffects: [...line.eventEffects],
+        inventoryItems: { ...line.inventoryItems },
+      })),
+    }
+    animationTimeouts.current.forEach((timeoutId) =>
+      window.clearTimeout(timeoutId),
+    )
+    animationTimeouts.current.clear()
+    setFactoryState(freshFactory)
+    setActiveLineTab(freshFactory.lines[0].id)
+    setPriceInput(formatNumber(freshFactory.lines[0].priceCents / 100))
+    setProductionAnimations([])
+    lastAnimatedProduction.current = freshFactory.lines[0].produced
+    setEventClock(now)
+    setGameEvent(null)
+    setNextEventAt(
+      now +
+        getRandomEventDelay(
+          FIRST_EVENT_MIN_DELAY_MS,
+          FIRST_EVENT_MAX_DELAY_MS,
+        ),
+    )
+    setSaveText(createGameSaveJson(freshFactory))
+    setIsSaveTextEdited(false)
+  }
+
   function loadSaveText(text = saveText) {
     try {
       const importedFactory = parseGameSave(text)
@@ -1609,6 +1647,7 @@ function App() {
           onDownload={downloadSave}
           onLoadText={() => loadSaveText()}
           onReadFile={(file) => void readSaveFile(file)}
+          onReset={startNewGame}
         />
       )}
     </main>
